@@ -42,6 +42,7 @@ import { ThemeMode } from '../utils/theme';
 import { FolderSelect } from './FolderSelect';
 import { CodeColorPicker } from './CodeColorPicker';
 import { DownloadButton } from './DownloadButton';
+import { WifiAuthSelect } from './WifiAuthSelect';
 
 interface GeneratorViewProps {
   folders: Folder[];
@@ -474,23 +475,20 @@ export function GeneratorView({
                 />
               </div>
 
-              <div className="flex gap-4 items-center">
-                <div className="flex-1">
-                  <label className="text-[11px] font-medium text-[#8e918f] block mb-1">
+              <div className="flex gap-3 sm:gap-4 items-end">
+                <div className="flex-1 min-w-0">
+                  <label className="text-[11px] font-medium text-[#8e918f] block mb-1.5">
                     {t.wifiAuthLabel}
                   </label>
-                  <select
+                  <WifiAuthSelect
                     value={wifiAuth}
-                    onChange={(e) => setWifiAuth(e.target.value as any)}
-                    className="w-full px-4 py-2.5 rounded-2xl bg-[#282a2f] text-xs text-[#e3e2e6] focus:outline-none focus:ring-2 focus:ring-[#a8f09b] border-none"
-                  >
-                    <option value="WPA">WPA/WPA2/WPA3</option>
-                    <option value="WEP">WEP</option>
-                    <option value="nopass">{lang === 'ru' ? 'Без пароля (Open)' : 'No Password (Open)'}</option>
-                  </select>
+                    onChange={setWifiAuth}
+                    lang={lang}
+                    theme={theme}
+                  />
                 </div>
 
-                <label className="flex items-center gap-2 cursor-pointer pt-4 text-xs text-[#c4c7c5]">
+                <label className="flex items-center gap-2 cursor-pointer pb-2.5 shrink-0 text-xs text-[#c4c7c5]">
                   <input
                     type="checkbox"
                     checked={wifiHidden}
@@ -499,7 +497,7 @@ export function GeneratorView({
                       isDark ? 'accent-[#a8f09b]' : 'accent-[#2e6c31]'
                     }`}
                   />
-                  <span>{t.wifiHiddenLabel}</span>
+                  <span className="whitespace-nowrap">{t.wifiHiddenLabel}</span>
                 </label>
               </div>
             </div>

@@ -16,10 +16,12 @@ import {
   resolveSafeCodeFormat,
   mergeDemoItems,
   stripDemoItems,
+  reorderFolders,
   BARCODE_FORMATS,
   DOWNLOAD_IMAGE_FORMATS,
   normalizeDownloadImageFormat,
   getDownloadFileExtension,
+  Folder,
   StoredQrItem,
 } from './qrLogic';
 import { scanBarcodeWithZxing, mapZxingFormatToCodeFormat, ZXing } from './qrScanner';
@@ -435,6 +437,40 @@ test('resolveDeviceLanguage defaults to ru for Russian locales and en for all ot
   assert.equal(resolveDeviceLanguage(''), 'en');
   assert.equal(resolveDeviceLanguage(undefined), 'en');
 });
+
+test('reorderFolders moves items cleanly without mutating original array', () => {
+  const original: Folder[] = [
+    { id: 'tickets', name: 'Tickets', icon: 'Ticket', color: '#a8f09b', isDefault: true },
+    { id: 'loyalty', name: 'Loyalty', icon: 'CreditCard', color: '#f59e0b', isDefault: true },
+    { id: 'wifi', name: 'Wi-Fi', icon: 'Wifi', color: '#10b981', isDefault: true },
+    { id: 'docs', name: 'Docs', icon: 'FileText', color: '#80d5d5', isDefault: true },
+  ];
+
+  // Move first item down to index 2
+  const movedDown = reorderFolders(original, 0, 2);
+  assert.deepEqual(
+    movedDown.map((f) => f.id),
+    ['loyalty', 'wifi', 'tickets', 'docs']
+  );
+  // Original array must stay untouched
+  assert.deepEqual(
+    original.map((f) => f.id),
+    ['tickets', 'loyalty', 'wifi', 'docs']
+  );
+
+  // Move last item up to index 1
+  const movedUp = reorderFolders(movedDown, 3, 1);
+  assert.deepEqual(
+    movedUp.map((f) => f.id),
+    ['loyalty', 'docs', 'wifi', 'tickets']
+  );
+
+  // No-op on equal or out-of-bounds indices
+  assert.equal(reorderFolders(original, 1, 1), original);
+  assert.equal(reorderFolders(original, -1, 2), original);
+  assert.equal(reorderFolders(original, 0, 10), original);
+});
+
 
 
 

@@ -14,7 +14,6 @@ import {
   X,
   AlertCircle,
   FolderCog,
-  Pencil,
 } from 'lucide-react';
 import {
   Folder,
@@ -26,10 +25,11 @@ import {
 } from '../utils/qrLogic';
 import { generateQrDataUrl } from '../utils/qrRenderer';
 import { playTapSound, triggerHaptic } from '../utils/audio';
-import { Language, TRANSLATIONS, getLocalizedFolderName, formatCodeCount } from '../utils/i18n';
+import { Language, TRANSLATIONS, getLocalizedFolderName } from '../utils/i18n';
 import { ThemeMode } from '../utils/theme';
 import { getFolderIcon } from './FolderSelect';
 import { SortSelect } from './SortSelect';
+import { ManageFoldersModal } from './ManageFoldersModal';
 
 interface GalleryViewProps {
   items: StoredQrItem[];
@@ -44,6 +44,7 @@ interface GalleryViewProps {
   onOpenCreateFolder: () => void;
   onEditFolder: (folder: Folder) => void;
   onDeleteFolder: (folderId: string) => void;
+  onReorderFolders: (fromIndex: number, toIndex: number) => void;
   onExportBackup: () => void;
   onImportBackup: (items: StoredQrItem[]) => void;
   onNavigateToScan: () => void;
@@ -63,6 +64,7 @@ export function GalleryView({
   onOpenCreateFolder,
   onEditFolder,
   onDeleteFolder,
+  onReorderFolders,
   onExportBackup,
   onImportBackup,
   onNavigateToScan,
@@ -77,7 +79,6 @@ export function GalleryView({
   const [movingItemId, setMovingItemId] = useState<string | null>(null);
   const [itemToDelete, setItemToDelete] = useState<StoredQrItem | null>(null);
   const [manageFoldersOpen, setManageFoldersOpen] = useState(false);
-  const [folderPendingDelete, setFolderPendingDelete] = useState<Folder | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
 
   // If currently selected folder was deleted, reset filter to 'all'
@@ -334,7 +335,6 @@ export function GalleryView({
             type="button"
             onClick={() => {
               playTapSound();
-              setFolderPendingDelete(null);
               setManageFoldersOpen(true);
             }}
             className={`h-8 px-3 rounded-full text-xs font-bold whitespace-nowrap transition-colors flex items-center gap-1.5 shrink-0 border ${
@@ -708,198 +708,19 @@ export function GalleryView({
         </div>
       )}
 
-      {/* Manage Folders Modal (Create / Edit Icon & Color / Delete) */}
-      {manageFoldersOpen && (
-        <div
-          className="fixed inset-0 z-50 bg-black/65 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150"
-          role="dialog"
-          aria-modal="true"
-          aria-label={t.manageFoldersTitle}
-          onClick={() => {
-            setFolderPendingDelete(null);
-            setManageFoldersOpen(false);
-          }}
-        >
-          <div
-            className={`w-full max-w-md rounded-[28px] p-6 shadow-2xl space-y-4 border max-h-[88vh] flex flex-col ${
-              isDark ? 'bg-[#1e1f23] text-[#e3e2e6] border-white/[0.08]' : 'bg-white text-[#191c19] border-black/[0.08]'
-            }`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className={`w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 ${
-                  isDark ? 'bg-[#244927] text-[#a8f09b]' : 'bg-[#e8f5e9] text-[#2e6c31]'
-                }`}>
-                  <FolderCog className="w-4 h-4" />
-                </div>
-                <div className="min-w-0">
-                  <h3 className="font-bold text-base leading-tight truncate">
-                    {t.manageFoldersTitle}
-                  </h3>
-                  <p className={`text-[11px] truncate ${isDark ? 'text-[#8e918f]' : 'text-[#575a56]'}`}>
-                    {t.manageFoldersDesc}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  playTapSound();
-                  setFolderPendingDelete(null);
-                  setManageFoldersOpen(false);
-                }}
-                className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-colors ${
-                  isDark ? 'bg-white/[0.04] hover:bg-white/[0.08] text-[#c4c7c5]' : 'bg-black/[0.04] hover:bg-black/[0.08] text-[#575a56]'
-                }`}
-                aria-label="Close"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Inline Folder Delete Confirmation */}
-            {folderPendingDelete && (
-              <div className={`p-3.5 rounded-2xl border space-y-2.5 animate-in fade-in ${
-                isDark
-                  ? 'bg-[#371e1d] text-[#ffdad6] border-[#ffb4ab]/25'
-                  : 'bg-[#fde8e8] text-[#690005] border-[#b3261e]/20'
-              }`}>
-                <div className="space-y-0.5">
-                  <div className="text-xs font-bold">
-                    {t.deleteFolderTitle} «{getLocalizedFolderName(folderPendingDelete.id, folderPendingDelete.name, lang)}»
-                  </div>
-                  <p className={`text-[11px] leading-relaxed ${isDark ? 'text-[#ffdad6]/85' : 'text-[#690005]/85'}`}>
-                    {t.deleteFolderConfirm}
-                  </p>
-                </div>
-                <div className="flex items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      playTapSound();
-                      setFolderPendingDelete(null);
-                    }}
-                    className={`px-3.5 py-1.5 rounded-full text-xs font-semibold ${
-                      isDark ? 'bg-white/10 hover:bg-white/20' : 'bg-black/5 hover:bg-black/10'
-                    }`}
-                  >
-                    {t.cancelBtn}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      playTapSound();
-                      onDeleteFolder(folderPendingDelete.id);
-                      setFolderPendingDelete(null);
-                    }}
-                    className={`px-4 py-1.5 rounded-full text-xs font-bold hover:brightness-105 ${
-                      isDark ? 'bg-[#ffb4ab] text-[#690005]' : 'bg-[#b3261e] text-white'
-                    }`}
-                  >
-                    {t.deleteBtn}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Folder List */}
-            <div className="overflow-y-auto space-y-2 pr-1">
-              {folders.map((f) => {
-                const localizedName = getLocalizedFolderName(f.id, f.name, lang);
-                const count = folderCounts[f.id] || 0;
-                const canDelete = folders.length > 1;
-
-                return (
-                  <div
-                    key={f.id}
-                    className={`p-3 rounded-2xl flex items-center justify-between gap-2 border ${
-                      isDark ? 'bg-[#282a2f] border-white/[0.04]' : 'bg-[#f7f9f5] border-black/[0.06]'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div
-                        className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-                        style={{
-                          backgroundColor: `${f.color}22`,
-                          color: f.color,
-                        }}
-                      >
-                        {getFolderIcon(f, 'w-4 h-4')}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-xs font-bold truncate">
-                          {localizedName}
-                        </div>
-                        <div className={`text-[10px] ${isDark ? 'text-[#8e918f]' : 'text-[#575a56]'}`}>
-                          {formatCodeCount(count, lang)}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          playTapSound();
-                          setFolderPendingDelete(null);
-                          setManageFoldersOpen(false);
-                          onEditFolder(f);
-                        }}
-                        className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
-                          isDark ? 'bg-[#1e1f23] hover:bg-[#33353a] text-[#c4c7c5]' : 'bg-white hover:bg-[#e2e6df] text-[#404943]'
-                        }`}
-                        title={t.editFolderTooltip}
-                        aria-label={`${t.editFolderTooltip}: ${localizedName}`}
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-
-                      <button
-                        type="button"
-                        disabled={!canDelete}
-                        onClick={() => {
-                          playTapSound();
-                          setFolderPendingDelete(f);
-                        }}
-                        className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors disabled:opacity-35 ${
-                          isDark
-                            ? 'bg-[#1e1f23] hover:bg-[#93000a] text-[#c4c7c5] hover:text-[#ffdad6]'
-                            : 'bg-white hover:bg-[#fde8e8] text-[#404943] hover:text-[#b3261e]'
-                        }`}
-                        title={canDelete ? t.deleteFolderTooltip : t.cannotDeleteLastFolder}
-                        aria-label={`${t.deleteFolderTooltip}: ${localizedName}`}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="pt-1 flex gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  playTapSound();
-                  setFolderPendingDelete(null);
-                  setManageFoldersOpen(false);
-                  onOpenCreateFolder();
-                }}
-                className={`flex-1 py-3 px-4 rounded-full font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all active:scale-95 ${
-                  isDark
-                    ? 'bg-[#a8f09b] hover:brightness-105 text-[#0b3810]'
-                    : 'bg-[#2e6c31] hover:bg-[#255928] text-white'
-                }`}
-              >
-                <Plus className="w-4 h-4" />
-                <span>{t.newFolderChip}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Manage Folders Modal (Hold to Reorder / Create / Edit / Delete) */}
+      <ManageFoldersModal
+        isOpen={manageFoldersOpen}
+        folders={folders}
+        folderCounts={folderCounts}
+        lang={lang}
+        theme={theme}
+        onClose={() => setManageFoldersOpen(false)}
+        onOpenCreateFolder={onOpenCreateFolder}
+        onEditFolder={onEditFolder}
+        onDeleteFolder={onDeleteFolder}
+        onReorderFolders={onReorderFolders}
+      />
     </div>
   );
 }

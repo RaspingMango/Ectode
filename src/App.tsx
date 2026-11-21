@@ -28,6 +28,7 @@ import {
   Folder,
   mergeDemoItems,
   stripDemoItems,
+  reorderFolders,
 } from './utils/qrLogic';
 import {
   SEED_ITEMS,
@@ -370,6 +371,10 @@ export default function App() {
     setFolders(remaining);
   };
 
+  const handleReorderFolders = (fromIndex: number, toIndex: number) => {
+    setFolders((prev) => reorderFolders(prev, fromIndex, toIndex));
+  };
+
   const activeSectionTitle =
     activeTab === 'scanner'
       ? t.tabScanner
@@ -522,6 +527,7 @@ export default function App() {
               setFolderModalOpen(true);
             }}
             onDeleteFolder={handleDeleteFolder}
+            onReorderFolders={handleReorderFolders}
             onExportBackup={handleExportBackup}
             onImportBackup={handleImportBackup}
             onNavigateToScan={() => setActiveTab('scanner')}
@@ -787,7 +793,7 @@ export default function App() {
                   <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
                     theme === 'dark' ? 'bg-[#244927] text-[#a8f09b]' : 'bg-[#e8f5e9] text-[#2e6c31]'
                   }`}>
-                    v1.4.1
+                    v1.4.2
                   </span>
                 </div>
               </div>

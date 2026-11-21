@@ -534,3 +534,28 @@ export function stripDemoItems(
   return currentItems.filter((item) => !idSet.has(item.id));
 }
 
+/**
+ * Reorders folders immutably by moving an entry from `fromIndex` to `toIndex`.
+ */
+export function reorderFolders(
+  folders: Folder[],
+  fromIndex: number,
+  toIndex: number
+): Folder[] {
+  if (
+    fromIndex === toIndex ||
+    fromIndex < 0 ||
+    toIndex < 0 ||
+    fromIndex >= folders.length ||
+    toIndex >= folders.length
+  ) {
+    return folders;
+  }
+
+  const next = [...folders];
+  const [moved] = next.splice(fromIndex, 1);
+  next.splice(toIndex, 0, moved);
+  return next;
+}
+
+

@@ -337,9 +337,9 @@ export function FolderModal({
               </div>
 
               {([
-                { key: 'r' as const, label: t.redLabel, val: activeRgb.r, accent: 'accent-red-500', badge: 'text-red-400' },
-                { key: 'g' as const, label: t.greenLabel, val: activeRgb.g, accent: 'accent-emerald-500', badge: 'text-emerald-400' },
-                { key: 'b' as const, label: t.blueLabel, val: activeRgb.b, accent: 'accent-blue-500', badge: 'text-blue-400' },
+                { key: 'r' as const, label: t.redLabel, val: activeRgb.r, sliderClass: 'rgb-range-r', badge: 'text-red-400' },
+                { key: 'g' as const, label: t.greenLabel, val: activeRgb.g, sliderClass: 'rgb-range-g', badge: 'text-emerald-400' },
+                { key: 'b' as const, label: t.blueLabel, val: activeRgb.b, sliderClass: 'rgb-range-b', badge: 'text-blue-400' },
               ]).map((ch) => (
                 <div key={ch.key} className="flex items-center gap-2">
                   <span className={`w-4 text-[11px] font-extrabold font-mono ${isDark ? ch.badge : 'text-[#191c19]'}`}>
@@ -352,7 +352,8 @@ export function FolderModal({
                     value={ch.val}
                     onChange={(e) => updateChannel(ch.key, Number(e.target.value))}
                     aria-label={`${t.folderColorLabel} ${ch.label}`}
-                    className={`flex-1 h-1.5 rounded-lg cursor-pointer ${ch.accent}`}
+                    style={{ '--rgb-track-pct': `${(ch.val / 255) * 100}%` } as React.CSSProperties}
+                    className={`flex-1 cursor-pointer rgb-range ${ch.sliderClass}`}
                   />
                   <input
                     type="number"
