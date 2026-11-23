@@ -47,6 +47,27 @@ import {
   shouldAutoStartScreenFromQuickAction,
   buildTilePinOutcomeMessage,
 } from './quickActions';
+import {
+  shouldUseNativeCamera,
+  computeCameraBackdropColor,
+  normalizeViewportBounds,
+  detectWebTrackTorchSupport,
+  shouldSuspendCamera,
+} from './nativeCamera';
+import {
+  SlotRect,
+  clampDragOffset,
+  computeDragBounds,
+  computeDragTargetIndex,
+  computeSiblingShiftY,
+} from './folderDrag';
+import {
+  isCustomDeepLink,
+  isWebHttpUrl,
+  resolveLinkActionPresentation,
+  sanitizeExternalUrl,
+  shouldUseNativeLinks,
+} from './nativeLinks';
 
 test('parseQrContent parses Wi-Fi payload correctly', () => {
   const raw = 'WIFI:S:Home_Network_5G;T:WPA;P:SuperSecret123;H:false;;';
@@ -470,6 +491,214 @@ test('reorderFolders moves items cleanly without mutating original array', () =>
   assert.equal(reorderFolders(original, -1, 2), original);
   assert.equal(reorderFolders(original, 0, 10), original);
 });
+
+test('nativeCamera helpers route Android platform, compute theme backdrop, normalize bounds, and probe torch support', () => {
+  assert.equal(shouldUseNativeCamera(true, 'android'), true);
+  assert.equal(shouldUseNativeCamera(true, 'ios'), false);
+  assert.equal(shouldUseNativeCamera(false, 'android'), false);
+
+  assert.equal(computeCameraBackdropColor('dark'), '#121316');
+  assert.equal(computeCameraBackdropColor('light'), '#f7f9f5');
+
+  assert.deepEqual(
+    normalizeViewportBounds({ left: -5, top: 120.456, width: 0, height: 400.123 }, 28),
+    { left: 0, top: 120.46, width: 1, height: 400.12, borderRadius: 28 }
+  );
+
+  assert.equal(detectWebTrackTorchSupport({ getCapabilities: () => ({ torch: true }) }), true);
+  assert.equal(detectWebTrackTorchSupport({ getCapabilities: () => ({ torch: false }) }), false);
+  assert.equal(
+    detectWebTrackTorchSupport({ getCapabilities: () => ({}) }, { fillLightMode: ['off', 'torch'] }),
+    true
+  );
+  assert.equal(
+    detectWebTrackTorchSupport({ getCapabilities: () => ({}) }, { fillLightMode: ['off'] }),
+    false
+  );
+  assert.equal(detectWebTrackTorchSupport(null, null), false);
+
+  assert.equal(shouldSuspendCamera({}), false);
+  assert.equal(shouldSuspendCamera({ cleanModalOpen: true }), true);
+  assert.equal(shouldSuspendCamera({ aboutOpen: true }), true);
+  assert.equal(shouldSuspendCamera({ turnstileModalOpen: true }), true);
+  assert.equal(shouldSuspendCamera({ folderModalOpen: true }), true);
+});
+
+test('folderDrag bounds clamp dragged row strictly inside visible list boundaries', () => {
+  const slots: SlotRect[] = [
+    { top: 4, height: 60 },
+    { top: 72, height: 60 },
+    { top: 140, height: 60 },
+    { top: 208, height: 60 },
+  ];
+
+  // Dragging index 1 (top=72, bottom=132) inside full list (firstTop=4, lastBottom=268)
+  const bounds = computeDragBounds(slots, 1, 2, 270);
+  assert.equal(bounds.minOffsetY, 4 - 72); // -68 (aligned with top of slot 0)
+  assert.equal(bounds.maxOffsetY, 268 - 60 - 72); // +136 (aligned with bottom of slot 3)
+
+  // Extreme pointer drags past top or bottom clamp cleanly and never go out of bounds
+  assert.equal(clampDragOffset(-500, bounds), -68);
+  assert.equal(clampDragOffset(500, bounds), 136);
+  assert.equal(clampDragOffset(35, bounds), 35);
+});
+
+test('folderDrag computes exact slot index without cascading runaway on 1-slot drags', () => {
+  const slots: SlotRect[] = [
+    { top: 4, height: 60 },   // center 34
+    { top: 72, height: 60 },  // center 102 (midpoint 0<->1 is 68)
+    { top: 140, height: 60 }, // center 170 (midpoint 1<->2 is 136)
+    { top: 208, height: 60 }, // center 238 (midpoint 2<->3 is 204)
+  ];
+
+  // Dragging index 1: small jitter stays at index 1
+  assert.equal(computeDragTargetIndex(slots, 1, 0), 1);
+  assert.equal(computeDragTargetIndex(slots, 1, 20), 1);
+  assert.equal(computeDragTargetIndex(slots, 1, -20), 1);
+
+  // Moving 1 slot down (~40..90px, across midpoint 136 but before 204) lands strictly on index 2
+  assert.equal(computeDragTargetIndex(slots, 1, 35), 2);
+  assert.equal(computeDragTargetIndex(slots, 1, 68), 2);
+  assert.equal(computeDragTargetIndex(slots, 1, 95), 2);
+
+  // Moving back into slot 1 zone restores index 1
+  assert.equal(computeDragTargetIndex(slots, 1, 10), 1);
+
+  // Moving 1 slot up (<= -35px) lands strictly on index 0
+  assert.equal(computeDragTargetIndex(slots, 1, -35), 0);
+  assert.equal(computeDragTargetIndex(slots, 1, -68), 0);
+});
+
+test('folderDrag computes accurate sibling translateY shifts when dragging up or down', () => {
+  const slots: SlotRect[] = [
+    { top: 0, height: 60 },
+    { top: 68, height: 60 },
+    { top: 136, height: 60 },
+    { top: 204, height: 60 },
+  ];
+
+  // Dragging index 1 down to index 2: index 2 shifts up by -68, others stay 0
+  assert.equal(computeSiblingShiftY(0, 1, 2, slots), 0);
+  assert.equal(computeSiblingShiftY(1, 1, 2, slots), 0);
+  assert.equal(computeSiblingShiftY(2, 1, 2, slots), -68);
+  assert.equal(computeSiblingShiftY(3, 1, 2, slots), 0);
+
+  // Dragging index 3 up to index 1: indices 1 and 2 shift down by +68, index 0 stays 0
+  assert.equal(computeSiblingShiftY(0, 3, 1, slots), 0);
+  assert.equal(computeSiblingShiftY(1, 3, 1, slots), 68);
+  assert.equal(computeSiblingShiftY(2, 3, 1, slots), 68);
+  assert.equal(computeSiblingShiftY(3, 3, 1, slots), 0);
+});
+
+test('parseQrContent and nativeLinks validate deep links cleanly while blocking unsafe schemes', () => {
+  assert.equal(shouldUseNativeLinks(true, 'android'), true);
+  assert.equal(shouldUseNativeLinks(false, 'android'), false);
+  assert.equal(shouldUseNativeLinks(true, 'ios'), false);
+
+  assert.equal(sanitizeExternalUrl('https://github.com/RaspingMango/Ectode'), 'https://github.com/RaspingMango/Ectode');
+  assert.equal(sanitizeExternalUrl('tg://resolve?domain=ectode'), 'tg://resolve?domain=ectode');
+  assert.equal(sanitizeExternalUrl('geo:55.7558,37.6173'), 'geo:55.7558,37.6173');
+  assert.equal(sanitizeExternalUrl('javascript:alert(1)'), null);
+  assert.equal(sanitizeExternalUrl('data:text/html,<script>'), null);
+  assert.equal(sanitizeExternalUrl('file:///etc/passwd'), null);
+  assert.equal(sanitizeExternalUrl('content://media/external'), null);
+
+  assert.equal(isWebHttpUrl('https://github.com/RaspingMango/Ectode'), true);
+  assert.equal(isWebHttpUrl('tg://resolve?domain=ectode'), false);
+  assert.equal(isCustomDeepLink('tg://resolve?domain=ectode'), true);
+  assert.equal(isCustomDeepLink('geo:55.7558,37.6173'), true);
+  assert.equal(isCustomDeepLink('https://github.com'), false);
+  assert.equal(isCustomDeepLink('tel:+79991234567'), false);
+
+  const tgParsed = parseQrContent('tg://resolve?domain=ectode');
+  assert.equal(tgParsed.type, 'url');
+  assert.equal(tgParsed.actionUrl, 'tg://resolve?domain=ectode');
+
+  const ticketParsed = parseQrContent('TICKET:SU-2026-VIP');
+  assert.equal(ticketParsed.type, 'ticket');
+  assert.equal(ticketParsed.actionUrl, undefined);
+});
+
+test('resolveLinkActionPresentation prioritizes installed supported app with browser fallback', () => {
+  // Single supported app (e.g. GitHub) -> "Открыть в GitHub" + secondary Browser button
+  const githubSingle = resolveLinkActionPresentation({
+    url: 'https://github.com/RaspingMango/Ectode',
+    type: 'url',
+    inspection: {
+      isHttpUrl: true,
+      hasSupportedApp: true,
+      primaryApp: { packageName: 'com.github.android', label: 'GitHub' },
+      apps: [{ packageName: 'com.github.android', label: 'GitHub' }],
+    },
+    lang: 'ru',
+    defaultOpenInBrowserLabel: TRANSLATIONS.ru.openInBrowser,
+    openInAppLabel: TRANSLATIONS.ru.openInApp,
+    executeActionLabel: TRANSLATIONS.ru.executeAction,
+  });
+  assert.equal(githubSingle.mode, 'app');
+  assert.equal(githubSingle.primaryLabel, 'Открыть в GitHub');
+  assert.equal(githubSingle.showSecondaryBrowserButton, true);
+  assert.equal(githubSingle.targetPackageName, 'com.github.android');
+
+  // Multiple supported apps -> generic "Open in App" + secondary Browser button
+  const multiApp = resolveLinkActionPresentation({
+    url: 'https://t.me/ectode',
+    type: 'url',
+    inspection: {
+      isHttpUrl: true,
+      hasSupportedApp: true,
+      primaryApp: { packageName: 'org.telegram.messenger', label: 'Telegram' },
+      apps: [
+        { packageName: 'org.telegram.messenger', label: 'Telegram' },
+        { packageName: 'tw.nekomimi.nekogram', label: 'Nekogram' },
+      ],
+    },
+    lang: 'en',
+    defaultOpenInBrowserLabel: TRANSLATIONS.en.openInBrowser,
+    openInAppLabel: TRANSLATIONS.en.openInApp,
+    executeActionLabel: TRANSLATIONS.en.executeAction,
+  });
+  assert.equal(multiApp.mode, 'app');
+  assert.equal(multiApp.primaryLabel, 'Open in App');
+  assert.equal(multiApp.showSecondaryBrowserButton, true);
+  assert.equal(multiApp.targetPackageName, undefined);
+
+  // Regular URL with no dedicated app -> "Открыть в браузере"
+  const browserOnly = resolveLinkActionPresentation({
+    url: 'https://example.com',
+    type: 'url',
+    inspection: {
+      isHttpUrl: true,
+      hasSupportedApp: false,
+      primaryApp: null,
+      apps: [],
+    },
+    lang: 'ru',
+    defaultOpenInBrowserLabel: TRANSLATIONS.ru.openInBrowser,
+    openInAppLabel: TRANSLATIONS.ru.openInApp,
+    executeActionLabel: TRANSLATIONS.ru.executeAction,
+  });
+  assert.equal(browserOnly.mode, 'system');
+  assert.equal(browserOnly.primaryLabel, 'Открыть в браузере');
+  assert.equal(browserOnly.showSecondaryBrowserButton, false);
+
+  // Custom app deep link -> "Open in App" with no browser button
+  const customDeepLink = resolveLinkActionPresentation({
+    url: 'tg://resolve?domain=ectode',
+    type: 'url',
+    inspection: null,
+    lang: 'en',
+    defaultOpenInBrowserLabel: TRANSLATIONS.en.openInBrowser,
+    openInAppLabel: TRANSLATIONS.en.openInApp,
+    executeActionLabel: TRANSLATIONS.en.executeAction,
+  });
+  assert.equal(customDeepLink.mode, 'app');
+  assert.equal(customDeepLink.primaryLabel, 'Open in App');
+  assert.equal(customDeepLink.showSecondaryBrowserButton, false);
+});
+
+
+
 
 
 

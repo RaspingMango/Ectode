@@ -382,6 +382,22 @@ export function parseQrContent(raw: string, codeFormat: CodeFormat = 'QR_CODE'):
     };
   }
 
+  // 5b. Custom App Deep Links (tg://, whatsapp://, geo:, sms:, spotify://, etc.)
+  if (
+    !/\s/.test(trimmed) &&
+    (/^(geo|sms|smsto):\S+$/i.test(trimmed) ||
+      /^[a-z][a-z0-9+.-]{1,15}:\/\/\S+$/i.test(trimmed)) &&
+    !/^(javascript|data|vbscript|file|content):/i.test(trimmed)
+  ) {
+    return {
+      type: 'url',
+      codeFormat,
+      rawText: trimmed,
+      displayTitle: trimmed.length > 42 ? `${trimmed.slice(0, 42)}...` : trimmed,
+      actionUrl: trimmed,
+    };
+  }
+
   // 6. Ticket or Loyalty heuristics
   const lower = trimmed.toLowerCase();
   if (lower.includes('ticket') || lower.includes('билет') || lower.includes('pass') || lower.includes('boarding')) {

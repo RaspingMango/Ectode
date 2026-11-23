@@ -4,6 +4,8 @@ import {
   Copy,
   Share2,
   ExternalLink,
+  Smartphone,
+  Globe,
   Palette,
   Maximize2,
   Check,
@@ -49,6 +51,14 @@ import { ThemeMode } from '../utils/theme';
 import { FolderSelect } from './FolderSelect';
 import { CodeColorPicker } from './CodeColorPicker';
 import { DownloadButton } from './DownloadButton';
+import {
+  UrlInspectionResult,
+  inspectExternalUrl,
+  isNativeLinkPlatform,
+  openExternalUrl,
+  resolveLinkActionPresentation,
+  sanitizeExternalUrl,
+} from '../utils/nativeLinks';
 
 interface CleanQrModalProps {
   isOpen: boolean;
@@ -104,8 +114,11 @@ export function CleanQrModal({
   const [isCopiedImage, setIsCopiedImage] = useState(false);
   const [isDownloaded, setIsDownloaded] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [linkInspection, setLinkInspection] = useState<UrlInspectionResult | null>(null);
 
   const isBarcode = is1DBarcodeFormat(safeFormat);
+  const safeActionUrl = sanitizeExternalUrl(parsed.actionUrl);
+  const nativeLinkEnabled = isNativeLinkPlatform();
 
   const compatibleFormats = useMemo<CodeFormat[]>(() => {
     if (!rawContent) return ['QR_CODE'];
@@ -151,6 +164,39 @@ export function CleanQrModal({
     if (!isOpen || !rawContent) return;
     setParsed(parseQrContent(rawContent, safeFormat));
   }, [isOpen, rawContent, safeFormat]);
+
+  useEffect(() => {
+    if (!isOpen || !safeActionUrl || !nativeLinkEnabled) {
+      setLinkInspection(null);
+      return;
+    }
+
+    let cancelled = false;
+    setLinkInspection(null);
+    inspectExternalUrl(safeActionUrl).then((result) => {
+      if (!cancelled) {
+        setLinkInspection(result);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, safeActionUrl, nativeLinkEnabled]);
+
+  const linkAction = useMemo(
+    () =>
+      resolveLinkActionPresentation({
+        url: safeActionUrl || '',
+        type: parsed.type,
+        inspection: linkInspection,
+        lang,
+        defaultOpenInBrowserLabel: t.openInBrowser,
+        openInAppLabel: t.openInApp,
+        executeActionLabel: t.executeAction,
+      }),
+    [safeActionUrl, parsed.type, linkInspection, lang, t.openInBrowser, t.openInApp, t.executeAction]
+  );
 
   useEffect(() => {
     if (!isOpen || !rawContent) return;
@@ -584,23 +630,78 @@ export function CleanQrModal({
                 {rawContent}
               </div>
 
-              {parsed.actionUrl && (
-                <a
-                  href={parsed.actionUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  onClick={playTapSound}
-                  className={`w-full py-3 px-4 rounded-full text-xs font-bold flex items-center justify-center gap-2 transition-colors active:scale-95 shadow-sm ${
-                    isDark
-                      ? 'bg-[#244927] hover:bg-[#2f5c33] text-[#c4fbb8]'
-                      : 'bg-[#e8f5e9] hover:bg-[#d7eed9] text-[#1b5e20]'
-                  }`}
-                >
-                  <ExternalLink className={`w-4 h-4 ${isDark ? 'text-[#a8f09b]' : 'text-[#2e6c31]'}`} />
-                  <span>
-                    {parsed.type === 'url' ? t.openInBrowser : t.executeAction}
-                  </span>
-                </a>
+              {safeActionUrl && (
+                nativeLinkEnabled ? (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        playTapSound();
+                        const res = await openExternalUrl(safeActionUrl, {
+                          mode: linkAction.mode,
+                          packageName: linkAction.targetPackageName,
+                          chooserTitle: linkAction.primaryLabel,
+                        });
+                        if (!res.opened) {
+                          onShowToast?.(t.unableToOpenLink);
+                        }
+                      }}
+                      className={`flex-1 min-w-0 py-3 px-4 rounded-full text-xs font-bold flex items-center justify-center gap-2 transition-colors active:scale-95 shadow-sm ${
+                        isDark
+                          ? 'bg-[#244927] hover:bg-[#2f5c33] text-[#c4fbb8]'
+                          : 'bg-[#e8f5e9] hover:bg-[#d7eed9] text-[#1b5e20]'
+                      }`}
+                    >
+                      {linkAction.mode === 'app' ? (
+                        <Smartphone className={`w-4 h-4 shrink-0 ${isDark ? 'text-[#a8f09b]' : 'text-[#2e6c31]'}`} />
+                      ) : (
+                        <ExternalLink className={`w-4 h-4 shrink-0 ${isDark ? 'text-[#a8f09b]' : 'text-[#2e6c31]'}`} />
+                      )}
+                      <span className="truncate">{linkAction.primaryLabel}</span>
+                    </button>
+
+                    {linkAction.showSecondaryBrowserButton && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          playTapSound();
+                          const res = await openExternalUrl(safeActionUrl, {
+                            mode: 'browser',
+                            chooserTitle: t.openInBrowser,
+                          });
+                          if (!res.opened) {
+                            onShowToast?.(t.unableToOpenLink);
+                          }
+                        }}
+                        title={t.openInBrowserTooltip}
+                        aria-label={t.openInBrowser}
+                        className={`shrink-0 py-3 px-4 rounded-full text-xs font-semibold flex items-center justify-center gap-1.5 border transition-colors active:scale-95 ${
+                          isDark
+                            ? 'bg-[#282a2f] hover:bg-[#33353a] text-[#e3e2e6] border-white/[0.08]'
+                            : 'bg-[#f7f9f5] hover:bg-[#e8ece6] text-[#191c19] border-black/[0.08]'
+                        }`}
+                      >
+                        <Globe className={`w-3.5 h-3.5 shrink-0 ${isDark ? 'text-[#c4c7c5]' : 'text-[#404943]'}`} />
+                        <span>{t.openInBrowserShort}</span>
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <a
+                    href={safeActionUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={playTapSound}
+                    className={`w-full py-3 px-4 rounded-full text-xs font-bold flex items-center justify-center gap-2 transition-colors active:scale-95 shadow-sm ${
+                      isDark
+                        ? 'bg-[#244927] hover:bg-[#2f5c33] text-[#c4fbb8]'
+                        : 'bg-[#e8f5e9] hover:bg-[#d7eed9] text-[#1b5e20]'
+                    }`}
+                  >
+                    <ExternalLink className={`w-4 h-4 ${isDark ? 'text-[#a8f09b]' : 'text-[#2e6c31]'}`} />
+                    <span>{linkAction.primaryLabel}</span>
+                  </a>
+                )
               )}
             </div>
 

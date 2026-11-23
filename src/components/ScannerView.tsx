@@ -3,7 +3,7 @@ import {
   Camera,
   Monitor,
   Image as ImageIcon,
-  Zap,
+  Flashlight,
   RefreshCw,
   Upload,
   Clipboard,
@@ -20,11 +20,24 @@ import { playScanSuccessSound, playTapSound, triggerHaptic } from '../utils/audi
 import { readClipboardImageFromDevice } from '../utils/nativeFiles';
 import {
   isNativeScreenCapturePlatform,
+  mapNativeCodeFormat,
   startNativeScreenCapture,
   stopNativeScreenCapture,
   getNativeScreenCaptureStatus,
   addScreenCaptureStateListener,
 } from '../utils/screenCapture';
+import {
+  isNativeCameraPlatform,
+  computeCameraBackdropColor,
+  normalizeViewportBounds,
+  detectWebTrackTorchSupport,
+  startNativeCamera,
+  stopNativeCamera,
+  setNativeCameraTorch,
+  updateNativeCameraBounds,
+  addNativeCameraCodeListener,
+  addNativeCameraStateListener,
+} from '../utils/nativeCamera';
 import { Language, TRANSLATIONS } from '../utils/i18n';
 import { ThemeMode } from '../utils/theme';
 import {
@@ -38,6 +51,7 @@ interface ScannerViewProps {
   lang?: Language;
   theme?: ThemeMode;
   demoMode?: boolean;
+  suspended?: boolean;
   quickActionRequest?: QuickActionRequest | null;
   onQuickActionHandled?: (nonce: number) => void;
 }
@@ -49,6 +63,7 @@ export function ScannerView({
   lang = 'ru',
   theme = 'dark',
   demoMode = false,
+  suspended = false,
   quickActionRequest = null,
   onQuickActionHandled,
 }: ScannerViewProps) {
@@ -62,18 +77,37 @@ export function ScannerView({
   const [hasTorch, setHasTorch] = useState(false);
   const [isProcessingFile, setIsProcessingFile] = useState(false);
 
+  const viewportRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animFrameIdRef = useRef<number | null>(null);
+  const torchCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastScanTimestampRef = useRef<number>(0);
   const nativeScreenActiveRef = useRef<boolean>(false);
+  const nativeCameraActiveRef = useRef<boolean>(false);
   const lastHandledQuickNonceRef = useRef<number | null>(null);
   const pendingAutoScreenStartRef = useRef<boolean>(false);
-  const isNativeScreen = isNativeScreenCapturePlatform();
+  const themeRef = useRef<ThemeMode>(theme);
+  themeRef.current = theme;
 
-  // Stop active video media streams or native screen capture
+  const isNativeScreen = isNativeScreenCapturePlatform();
+  const isNativeCamera = isNativeCameraPlatform();
+
+  const readViewportBounds = useCallback(() => {
+    const rect = viewportRef.current?.getBoundingClientRect();
+    if (!rect || rect.width <= 0 || rect.height <= 0) {
+      return normalizeViewportBounds({ left: 16, top: 120, width: 320, height: 360 }, 28);
+    }
+    return normalizeViewportBounds(rect, 28);
+  }, []);
+
+  // Stop active video media streams, native CameraX, or native screen capture
   const stopCurrentStream = useCallback(() => {
+    if (torchCheckTimerRef.current) {
+      clearTimeout(torchCheckTimerRef.current);
+      torchCheckTimerRef.current = null;
+    }
     if (animFrameIdRef.current) {
       cancelAnimationFrame(animFrameIdRef.current);
       animFrameIdRef.current = null;
@@ -85,6 +119,10 @@ export function ScannerView({
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
+    if (nativeCameraActiveRef.current) {
+      nativeCameraActiveRef.current = false;
+      void stopNativeCamera();
+    }
     if (nativeScreenActiveRef.current) {
       nativeScreenActiveRef.current = false;
       void stopNativeScreenCapture();
@@ -94,7 +132,7 @@ export function ScannerView({
     setHasTorch(false);
   }, []);
 
-  // Frame processing loop
+  // Frame processing loop (Web / Desktop camera & desktop screen capture)
   const processVideoFrame = useCallback(() => {
     const video = videoRef.current;
     if (!video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
@@ -139,10 +177,68 @@ export function ScannerView({
     animFrameIdRef.current = requestAnimationFrame(processVideoFrame);
   }, [mode, onQrDetected, stopCurrentStream]);
 
-  // Start Camera Stream
+  const probeWebTorchSupport = useCallback(async (track: MediaStreamTrack | undefined): Promise<boolean> => {
+    if (!track) return false;
+    let photoCaps: { fillLightMode?: string[] } | null = null;
+    const ImageCaptureCtor = (window as unknown as {
+      ImageCapture?: new (t: MediaStreamTrack) => { getPhotoCapabilities?: () => Promise<{ fillLightMode?: string[] }> };
+    }).ImageCapture;
+
+    if (typeof ImageCaptureCtor === 'function') {
+      try {
+        const ic = new ImageCaptureCtor(track);
+        if (typeof ic.getPhotoCapabilities === 'function') {
+          photoCaps = await ic.getPhotoCapabilities();
+        }
+      } catch {
+        // Ignore ImageCapture errors on unsupported tracks
+      }
+    }
+
+    return detectWebTrackTorchSupport(track, photoCaps);
+  }, []);
+
+  // Start Camera Stream (Native Android CameraX or Web getUserMedia)
   const startCamera = useCallback(async () => {
+    if (suspended) return;
     stopCurrentStream();
     setErrorMsg(null);
+
+    if (isNativeCamera) {
+      try {
+        const res = await startNativeCamera({
+          facing: facingMode,
+          bounds: readViewportBounds(),
+          viewportWidth: typeof window !== 'undefined' ? window.innerWidth : 360,
+          backdropColor: computeCameraBackdropColor(themeRef.current),
+        });
+
+        if (res?.permissionDenied) {
+          nativeCameraActiveRef.current = false;
+          setErrorMsg(t.cameraPermissionDenied);
+          setHasTorch(false);
+          setTorchEnabled(false);
+          setIsScanning(false);
+          return;
+        }
+
+        if (res?.started) {
+          nativeCameraActiveRef.current = true;
+          setHasTorch(Boolean(res.hasTorch));
+          setTorchEnabled(Boolean(res.torchEnabled));
+          setIsScanning(true);
+        }
+      } catch (err: unknown) {
+        console.warn('Native camera start error:', err);
+        nativeCameraActiveRef.current = false;
+        setHasTorch(false);
+        setTorchEnabled(false);
+        setIsScanning(false);
+        setErrorMsg(t.cameraNotFound);
+      }
+      return;
+    }
+
     try {
       const constraints: MediaStreamConstraints = {
         video: {
@@ -162,27 +258,39 @@ export function ScannerView({
       }
 
       const track = stream.getVideoTracks()[0];
-      if (track) {
-        const capabilities = (track.getCapabilities && track.getCapabilities()) as any;
-        if (capabilities && capabilities.torch) {
-          setHasTorch(true);
-        }
+      const supportedNow = await probeWebTorchSupport(track);
+      if (supportedNow) {
+        setHasTorch(true);
+      } else if (track) {
+        torchCheckTimerRef.current = setTimeout(() => {
+          void probeWebTorchSupport(track).then((delayedSupport) => {
+            if (delayedSupport && streamRef.current === stream) {
+              setHasTorch(true);
+            }
+          });
+        }, 350);
       }
 
       setIsScanning(true);
       animFrameIdRef.current = requestAnimationFrame(processVideoFrame);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.warn('Camera start error:', err);
-      let msg: string = t.cameraNotFound;
-      if (err.name === 'NotAllowedError') {
-        msg = lang === 'ru' 
-          ? 'Разрешение на использование камеры отклонено. Разрешите доступ или воспользуйтесь режимом захвата экрана.'
-          : 'Camera permission was denied. Allow access or use Screen Capture.';
-      }
+      const errName = (err as { name?: string })?.name;
+      const msg = errName === 'NotAllowedError' ? t.cameraPermissionDenied : t.cameraNotFound;
       setErrorMsg(msg);
       setIsScanning(false);
     }
-  }, [facingMode, lang, processVideoFrame, stopCurrentStream, t.cameraNotFound]);
+  }, [
+    facingMode,
+    isNativeCamera,
+    probeWebTorchSupport,
+    processVideoFrame,
+    readViewportBounds,
+    stopCurrentStream,
+    suspended,
+    t.cameraNotFound,
+    t.cameraPermissionDenied,
+  ]);
 
   // Start Screen Capture Stream (Native Android MediaProjection or Browser getDisplayMedia)
   const startScreenCapture = useCallback(async () => {
@@ -312,6 +420,108 @@ export function ScannerView({
   }, [isNativeScreen, mode]);
 
   useEffect(() => {
+    if (!isNativeCamera) return;
+    let disposed = false;
+    const handles: Array<{ remove: () => Promise<void> }> = [];
+
+    const setup = async () => {
+      const codeHandle = await addNativeCameraCodeListener((event) => {
+        if (disposed || !event?.data) return;
+        nativeCameraActiveRef.current = false;
+        setIsScanning(false);
+        setTorchEnabled(false);
+        setHasTorch(false);
+        playScanSuccessSound();
+        triggerHaptic([40, 30, 80]);
+        onQrDetected(event.data, 'camera', mapNativeCodeFormat(event.format));
+      });
+      if (codeHandle) handles.push(codeHandle);
+
+      const stateHandle = await addNativeCameraStateListener((state) => {
+        if (disposed) return;
+        if (!state.running) {
+          nativeCameraActiveRef.current = false;
+          setIsScanning(false);
+          setTorchEnabled(Boolean(state.torchEnabled));
+        }
+      });
+      if (stateHandle) handles.push(stateHandle);
+    };
+
+    void setup();
+
+    const handleResume = () => {
+      if (
+        document.visibilityState === 'visible' &&
+        mode === 'camera' &&
+        !suspended &&
+        !nativeCameraActiveRef.current
+      ) {
+        void startCamera();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleResume);
+    window.addEventListener('focus', handleResume);
+
+    return () => {
+      disposed = true;
+      document.removeEventListener('visibilitychange', handleResume);
+      window.removeEventListener('focus', handleResume);
+      handles.forEach((h) => {
+        void h.remove();
+      });
+    };
+  }, [isNativeCamera, mode, onQrDetected, startCamera, suspended]);
+
+  const isNativeCameraRendering = isNativeCamera && mode === 'camera' && isScanning && !suspended;
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('native-camera-active', isNativeCameraRendering);
+    return () => {
+      document.documentElement.classList.remove('native-camera-active');
+    };
+  }, [isNativeCameraRendering]);
+
+  useEffect(() => {
+    if (!isNativeCameraRendering) return;
+
+    const syncBounds = () => {
+      void updateNativeCameraBounds({
+        bounds: readViewportBounds(),
+        viewportWidth: typeof window !== 'undefined' ? window.innerWidth : 360,
+        backdropColor: computeCameraBackdropColor(theme),
+      });
+    };
+
+    syncBounds();
+
+    const observer =
+      typeof ResizeObserver !== 'undefined' && viewportRef.current
+        ? new ResizeObserver(syncBounds)
+        : null;
+    if (observer && viewportRef.current) {
+      observer.observe(viewportRef.current);
+    }
+
+    window.addEventListener('resize', syncBounds);
+    window.addEventListener('scroll', syncBounds, true);
+
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', syncBounds);
+      window.removeEventListener('scroll', syncBounds, true);
+    };
+  }, [isNativeCameraRendering, readViewportBounds, theme]);
+
+  useEffect(() => {
+    if (suspended) {
+      stopCurrentStream();
+      return () => {
+        stopCurrentStream();
+      };
+    }
+
     if (mode === 'camera') {
       startCamera();
     } else if (mode === 'screen') {
@@ -329,7 +539,7 @@ export function ScannerView({
     return () => {
       stopCurrentStream();
     };
-  }, [mode, startCamera, startScreenCapture, stopCurrentStream]);
+  }, [mode, startCamera, startScreenCapture, stopCurrentStream, suspended]);
 
   useEffect(() => {
     if (!quickActionRequest) return;
@@ -344,7 +554,7 @@ export function ScannerView({
     if (targetMode === 'camera') {
       pendingAutoScreenStartRef.current = false;
       if (mode === 'camera') {
-        if (!isScanning) {
+        if (!isScanning && !suspended) {
           void startCamera();
         }
       } else {
@@ -364,27 +574,57 @@ export function ScannerView({
     }
 
     onQuickActionHandled?.(quickActionRequest.nonce);
-  }, [isScanning, mode, onQuickActionHandled, quickActionRequest, startCamera, startScreenCapture]);
+  }, [isScanning, mode, onQuickActionHandled, quickActionRequest, startCamera, startScreenCapture, suspended]);
 
   const toggleTorch = async () => {
     playTapSound();
+    triggerHaptic(15);
+    const nextState = !torchEnabled;
+
+    if (isNativeCamera && nativeCameraActiveRef.current) {
+      try {
+        const res = await setNativeCameraTorch(nextState);
+        if (res && res.supported === false) {
+          setHasTorch(false);
+          setTorchEnabled(false);
+          return;
+        }
+        setTorchEnabled(Boolean(res?.enabled));
+      } catch (e) {
+        console.warn('Native torch toggle failed:', e);
+      }
+      return;
+    }
+
     if (!streamRef.current) return;
     const track = streamRef.current.getVideoTracks()[0];
-    if (track) {
+    if (!track) return;
+
+    try {
+      await (track as unknown as { applyConstraints: (c: unknown) => Promise<void> }).applyConstraints({
+        advanced: [{ torch: nextState }],
+      });
+      setTorchEnabled(nextState);
+    } catch {
       try {
-        const nextState = !torchEnabled;
-        await (track as any).applyConstraints({
-          advanced: [{ torch: nextState }],
+        await (track as unknown as { applyConstraints: (c: unknown) => Promise<void> }).applyConstraints({
+          torch: nextState,
         });
         setTorchEnabled(nextState);
       } catch (e) {
         console.warn('Torch toggle failed:', e);
+        if (!nextState) {
+          // Workaround for WebView/Chromium drivers that turn torch on but ignore torch: false
+          await startCamera();
+        }
       }
     }
   };
 
   const flipCamera = () => {
     playTapSound();
+    triggerHaptic(15);
+    setTorchEnabled(false);
     setFacingMode((prev) => (prev === 'environment' ? 'user' : 'environment'));
   };
 
@@ -528,27 +768,30 @@ export function ScannerView({
       </div>
 
       {/* Main Viewport Container */}
-      <div className="relative flex-1 min-h-[360px] sm:min-h-[430px] bg-[#1a1b1f] rounded-[28px] overflow-hidden border border-white/[0.04] shadow-xl flex flex-col items-center justify-center">
+      <div
+        ref={viewportRef}
+        className="native-camera-viewport relative flex-1 min-h-[380px] sm:min-h-[430px] bg-[#1a1b1f] rounded-[28px] overflow-hidden border border-white/[0.04] shadow-xl flex flex-col items-center justify-center"
+      >
         <video
           ref={videoRef}
           playsInline
           muted
           className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
-            isScanning ? 'opacity-100' : 'opacity-0 pointer-events-none'
+            isScanning && !isNativeCameraRendering ? 'opacity-100' : 'opacity-0 pointer-events-none'
           }`}
         />
 
         {/* --- CAMERA & DESKTOP ACTIVE SCREEN STREAM OVERLAY --- */}
         {isScanning && !(mode === 'screen' && isNativeScreen) && (
-          <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-between p-6">
-            <div className="px-4 py-1.5 rounded-full bg-[#1e1f23]/90 backdrop-blur-md border border-white/[0.08] flex items-center gap-2 text-xs font-semibold text-[#a8f09b]">
+          <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-between p-4 sm:p-6 gap-3">
+            <div className="px-4 py-1.5 rounded-full bg-[#121316]/80 backdrop-blur-md border border-white/15 flex items-center gap-2 text-xs font-semibold text-[#a8f09b] shadow-sm">
               <span className="w-2 h-2 rounded-full bg-[#a8f09b] animate-ping" />
               <span>
                 {mode === 'camera' ? t.scanningCamera : t.scanningScreen}
               </span>
             </div>
 
-            <div className="relative w-64 h-64 sm:w-72 sm:h-72 flex items-center justify-center">
+            <div className="relative w-52 h-52 sm:w-64 sm:h-64 flex items-center justify-center">
               <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-[#a8f09b] rounded-tl-2xl" />
               <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-[#a8f09b] rounded-tr-2xl" />
               <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-[#a8f09b] rounded-bl-2xl" />
@@ -562,22 +805,28 @@ export function ScannerView({
                 <>
                   {hasTorch && (
                     <button
+                      type="button"
                       onClick={toggleTorch}
-                      className={`w-12 h-12 rounded-full backdrop-blur-md flex items-center justify-center transition-all ${
+                      data-testid="torch-toggle-btn"
+                      aria-label={torchEnabled ? t.torchTurnOff : t.torchTurnOn}
+                      aria-pressed={torchEnabled}
+                      title={torchEnabled ? t.torchTurnOff : t.torchTurnOn}
+                      className={`w-12 h-12 rounded-full backdrop-blur-md flex items-center justify-center transition-all active:scale-95 shadow-lg ${
                         torchEnabled
-                          ? 'bg-[#a8f09b] text-[#0b3810] shadow-md'
-                          : 'bg-[#1e1f23]/80 text-[#e3e2e6] hover:bg-[#282a2f]'
+                          ? 'bg-[#a8f09b] text-[#0b3810] ring-2 ring-[#a8f09b]/50'
+                          : 'bg-[#121316]/75 text-white hover:bg-[#121316]/90 border border-white/20'
                       }`}
-                      aria-label="Torch"
                     >
-                      <Zap className="w-5 h-5" />
+                      <Flashlight className="w-5 h-5" />
                     </button>
                   )}
 
                   <button
+                    type="button"
                     onClick={flipCamera}
-                    className="w-12 h-12 rounded-full bg-[#1e1f23]/80 backdrop-blur-md text-[#e3e2e6] hover:bg-[#282a2f] active:rotate-180 flex items-center justify-center transition-all"
-                    aria-label="Switch camera"
+                    className="w-12 h-12 rounded-full bg-[#121316]/75 backdrop-blur-md text-white hover:bg-[#121316]/90 active:rotate-180 flex items-center justify-center transition-all border border-white/20 shadow-lg"
+                    aria-label={t.flipCameraLabel}
+                    title={t.flipCameraLabel}
                   >
                     <RefreshCw className="w-5 h-5" />
                   </button>

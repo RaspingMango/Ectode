@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { FolderCog, GripVertical, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { Folder } from '../utils/qrLogic';
+import {
+  SlotRect,
+  clampDragOffset,
+  computeDragBounds,
+  computeDragTargetIndex,
+  computeSiblingShiftY,
+} from '../utils/folderDrag';
 import { Language, TRANSLATIONS, formatCodeCount, getLocalizedFolderName } from '../utils/i18n';
 import { ThemeMode } from '../utils/theme';
 import { playTapSound, triggerHaptic } from '../utils/audio';
@@ -19,9 +26,29 @@ interface ManageFoldersModalProps {
   onReorderFolders: (fromIndex: number, toIndex: number) => void;
 }
 
+interface DragPreviewState {
+  initialIndex: number;
+  hoverIndex: number;
+  slots: SlotRect[];
+}
+
+interface DragSession {
+  folderId: string;
+  initialIndex: number;
+  anchorClientY: number;
+  startScrollTop: number;
+  latestClientY: number;
+  slots: SlotRect[];
+  hoverIndex: number;
+  offsetY: number;
+  pointerId: number;
+}
+
 const HOLD_TO_DRAG_MS = 200;
 const GRIP_HOLD_TO_DRAG_MS = 50;
 const CANCEL_SCROLL_THRESHOLD_PX = 8;
+const AUTO_SCROLL_EDGE_PX = 36;
+const AUTO_SCROLL_STEP_PX = 6;
 
 export function ManageFoldersModal({
   isOpen,
@@ -41,6 +68,7 @@ export function ManageFoldersModal({
   const [folderPendingDelete, setFolderPendingDelete] = useState<Folder | null>(null);
   const [draggingFolderId, setDraggingFolderId] = useState<string | null>(null);
   const [dragOffsetY, setDragOffsetY] = useState(0);
+  const [dragPreview, setDragPreview] = useState<DragPreviewState | null>(null);
 
   const foldersRef = useRef<Folder[]>(folders);
   foldersRef.current = folders;
@@ -48,10 +76,11 @@ export function ManageFoldersModal({
   const onReorderRef = useRef(onReorderFolders);
   onReorderRef.current = onReorderFolders;
 
+  const listRef = useRef<HTMLDivElement | null>(null);
   const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const draggingIdRef = useRef<string | null>(null);
-  const dragAnchorYRef = useRef<number>(0);
+  const autoScrollRafRef = useRef<number | null>(null);
+  const dragSessionRef = useRef<DragSession | null>(null);
 
   const clearHoldTimer = () => {
     if (holdTimerRef.current) {
@@ -60,12 +89,25 @@ export function ManageFoldersModal({
     }
   };
 
+  const stopAutoScroll = () => {
+    if (autoScrollRafRef.current !== null) {
+      cancelAnimationFrame(autoScrollRafRef.current);
+      autoScrollRafRef.current = null;
+    }
+  };
+
+  const resetDragState = () => {
+    clearHoldTimer();
+    stopAutoScroll();
+    dragSessionRef.current = null;
+    setDraggingFolderId(null);
+    setDragOffsetY(0);
+    setDragPreview(null);
+  };
+
   useEffect(() => {
     if (!isOpen) {
-      clearHoldTimer();
-      draggingIdRef.current = null;
-      setDraggingFolderId(null);
-      setDragOffsetY(0);
+      resetDragState();
       setFolderPendingDelete(null);
     }
   }, [isOpen]);
@@ -73,20 +115,144 @@ export function ManageFoldersModal({
   useEffect(() => {
     return () => {
       clearHoldTimer();
+      stopAutoScroll();
     };
   }, []);
 
   if (!isOpen) return null;
 
-  const startDrag = (folderId: string, clientY: number) => {
+  const updateDragPosition = (clientY: number) => {
+    const session = dragSessionRef.current;
+    if (!session) return;
+
+    session.latestClientY = clientY;
+    const listEl = listRef.current;
+    const scrollDelta = listEl ? listEl.scrollTop - session.startScrollTop : 0;
+    const rawOffsetY = clientY - session.anchorClientY + scrollDelta;
+
+    const viewportTop = listEl ? listEl.scrollTop + 2 : undefined;
+    const viewportBottom = listEl
+      ? listEl.scrollTop + listEl.clientHeight - 2
+      : undefined;
+
+    const bounds = computeDragBounds(
+      session.slots,
+      session.initialIndex,
+      viewportTop,
+      viewportBottom
+    );
+    const clampedOffset = clampDragOffset(rawOffsetY, bounds);
+    const nextTargetIndex = computeDragTargetIndex(
+      session.slots,
+      session.initialIndex,
+      clampedOffset
+    );
+
+    session.offsetY = clampedOffset;
+    setDragOffsetY(clampedOffset);
+
+    if (nextTargetIndex !== session.hoverIndex) {
+      session.hoverIndex = nextTargetIndex;
+      triggerHaptic(12);
+      setDragPreview({
+        initialIndex: session.initialIndex,
+        hoverIndex: nextTargetIndex,
+        slots: session.slots,
+      });
+    }
+  };
+
+  const runAutoScrollLoop = () => {
+    const session = dragSessionRef.current;
+    const listEl = listRef.current;
+    if (!session || !listEl) {
+      autoScrollRafRef.current = null;
+      return;
+    }
+
+    if (listEl.scrollHeight > listEl.clientHeight) {
+      const listRect = listEl.getBoundingClientRect();
+      const pointerY = session.latestClientY;
+      let delta = 0;
+
+      if (pointerY < listRect.top + AUTO_SCROLL_EDGE_PX && listEl.scrollTop > 0) {
+        delta = -AUTO_SCROLL_STEP_PX;
+      } else if (
+        pointerY > listRect.bottom - AUTO_SCROLL_EDGE_PX &&
+        listEl.scrollTop < listEl.scrollHeight - listEl.clientHeight
+      ) {
+        delta = AUTO_SCROLL_STEP_PX;
+      }
+
+      if (delta !== 0) {
+        const prevScrollTop = listEl.scrollTop;
+        listEl.scrollTop = Math.max(
+          0,
+          Math.min(listEl.scrollHeight - listEl.clientHeight, prevScrollTop + delta)
+        );
+        if (listEl.scrollTop !== prevScrollTop) {
+          updateDragPosition(pointerY);
+        }
+      }
+    }
+
+    autoScrollRafRef.current = requestAnimationFrame(runAutoScrollLoop);
+  };
+
+  const startDrag = (folderId: string, anchorClientY: number, pointerId: number) => {
     clearHoldTimer();
-    draggingIdRef.current = folderId;
-    dragAnchorYRef.current = clientY;
+    const list = foldersRef.current;
+    const initialIndex = list.findIndex((item) => item.id === folderId);
+    if (initialIndex === -1 || list.length < 2) return;
+
+    const listEl = listRef.current;
+    const listRect = listEl?.getBoundingClientRect();
+    const startScrollTop = listEl ? listEl.scrollTop : 0;
+
+    // Snapshot untransformed slot positions once in scroll-content coordinates
+    const slots: SlotRect[] = list.map((item) => {
+      const el = rowRefs.current[item.id];
+      if (!el) {
+        return { top: 0, height: 64 };
+      }
+      const rect = el.getBoundingClientRect();
+      return {
+        top: listRect ? rect.top - listRect.top + startScrollTop : rect.top,
+        height: rect.height,
+      };
+    });
+
+    dragSessionRef.current = {
+      folderId,
+      initialIndex,
+      anchorClientY,
+      startScrollTop,
+      latestClientY: anchorClientY,
+      slots,
+      hoverIndex: initialIndex,
+      offsetY: 0,
+      pointerId,
+    };
+
+    try {
+      rowRefs.current[folderId]?.setPointerCapture?.(pointerId);
+    } catch {
+      // Ignore synthetic pointer events in non-browser/test environments
+    }
+
     setDraggingFolderId(folderId);
     setDragOffsetY(0);
+    setDragPreview({
+      initialIndex,
+      hoverIndex: initialIndex,
+      slots,
+    });
     setFolderPendingDelete(null);
     playTapSound();
     triggerHaptic(25);
+
+    stopAutoScroll();
+    autoScrollRafRef.current = requestAnimationFrame(runAutoScrollLoop);
   };
 
   const handleRowPointerDown = (
@@ -112,8 +278,8 @@ export function ManageFoldersModal({
     clearHoldTimer();
 
     holdTimerRef.current = setTimeout(() => {
-      if (!cleanedUp) {
-        startDrag(folder.id, latestY);
+      if (!cleanedUp && !dragSessionRef.current) {
+        startDrag(folder.id, latestY, activePointerId);
       }
     }, isGripHandle ? GRIP_HOLD_TO_DRAG_MS : HOLD_TO_DRAG_MS);
 
@@ -121,93 +287,70 @@ export function ManageFoldersModal({
       if (moveEvent.pointerId !== activePointerId) return;
       latestY = moveEvent.clientY;
 
-      if (!draggingIdRef.current) {
+      if (!dragSessionRef.current) {
         const dx = Math.abs(moveEvent.clientX - startX);
         const dy = Math.abs(moveEvent.clientY - startY);
 
         if (isGripHandle && dy > 4) {
-          startDrag(folder.id, moveEvent.clientY);
+          startDrag(folder.id, startY, activePointerId);
+          moveEvent.preventDefault();
+          updateDragPosition(moveEvent.clientY);
           return;
         }
 
         if (dx > CANCEL_SCROLL_THRESHOLD_PX || dy > CANCEL_SCROLL_THRESHOLD_PX) {
-          cleanup();
+          cleanup(false);
         }
         return;
       }
 
+      if (dragSessionRef.current.folderId !== folder.id) return;
       moveEvent.preventDefault();
-
-      const activeId = draggingIdRef.current;
-      const list = foldersRef.current;
-      const currentIdx = list.findIndex((item) => item.id === activeId);
-      if (currentIdx === -1) return;
-
-      const currentEl = rowRefs.current[activeId];
-      if (!currentEl) return;
-      const currentRect = currentEl.getBoundingClientRect();
-
-      let targetIdx = currentIdx;
-      let targetRect: DOMRect | null = null;
-
-      if (currentIdx > 0) {
-        const prevFolder = list[currentIdx - 1];
-        const prevEl = rowRefs.current[prevFolder.id];
-        if (prevEl) {
-          const prevRect = prevEl.getBoundingClientRect();
-          const prevMidY = prevRect.top + prevRect.height / 2;
-          if (moveEvent.clientY < prevMidY) {
-            targetIdx = currentIdx - 1;
-            targetRect = prevRect;
-          }
-        }
-      }
-
-      if (targetIdx === currentIdx && currentIdx < list.length - 1) {
-        const nextFolder = list[currentIdx + 1];
-        const nextEl = rowRefs.current[nextFolder.id];
-        if (nextEl) {
-          const nextRect = nextEl.getBoundingClientRect();
-          const nextMidY = nextRect.top + nextRect.height / 2;
-          if (moveEvent.clientY > nextMidY) {
-            targetIdx = currentIdx + 1;
-            targetRect = nextRect;
-          }
-        }
-      }
-
-      if (targetIdx !== currentIdx && targetRect) {
-        const slotDelta = targetRect.top - currentRect.top;
-        dragAnchorYRef.current += slotDelta;
-        triggerHaptic(12);
-        onReorderRef.current(currentIdx, targetIdx);
-      }
-
-      setDragOffsetY(moveEvent.clientY - dragAnchorYRef.current);
+      updateDragPosition(moveEvent.clientY);
     };
 
-    const cleanup = () => {
+    const cleanup = (commitDrop: boolean) => {
       if (cleanedUp) return;
       cleanedUp = true;
       clearHoldTimer();
+      stopAutoScroll();
       window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerEnd);
-      window.removeEventListener('pointercancel', handlePointerEnd);
-      if (draggingIdRef.current === folder.id) {
-        draggingIdRef.current = null;
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerCancel);
+
+      const session = dragSessionRef.current;
+      if (session && session.folderId === folder.id) {
+        try {
+          rowRefs.current[folder.id]?.releasePointerCapture?.(session.pointerId);
+        } catch {
+          // Ignore if capture was already released
+        }
+
+        const { initialIndex, hoverIndex } = session;
+        dragSessionRef.current = null;
         setDraggingFolderId(null);
         setDragOffsetY(0);
+        setDragPreview(null);
+
+        if (commitDrop && hoverIndex !== initialIndex) {
+          onReorderRef.current(initialIndex, hoverIndex);
+        }
       }
     };
 
-    const handlePointerEnd = (endEvent: PointerEvent) => {
+    const handlePointerUp = (endEvent: PointerEvent) => {
       if (endEvent.pointerId !== activePointerId) return;
-      cleanup();
+      cleanup(true);
+    };
+
+    const handlePointerCancel = (cancelEvent: PointerEvent) => {
+      if (cancelEvent.pointerId !== activePointerId) return;
+      cleanup(false);
     };
 
     window.addEventListener('pointermove', handlePointerMove, { passive: false });
-    window.addEventListener('pointerup', handlePointerEnd);
-    window.addEventListener('pointercancel', handlePointerEnd);
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerCancel);
   };
 
   const handleGripKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
@@ -320,7 +463,9 @@ export function ManageFoldersModal({
 
         {/* Reorderable Folder List */}
         <div
-          className="overflow-y-auto space-y-2 pr-1 select-none"
+          ref={listRef}
+          data-testid="manage-folders-list"
+          className="overflow-y-auto overflow-x-hidden space-y-2 py-1 px-1 -mx-1 select-none"
           style={{ touchAction: draggingFolderId ? 'none' : 'pan-y' }}
         >
           {folders.map((f, index) => {
@@ -328,6 +473,15 @@ export function ManageFoldersModal({
             const count = folderCounts[f.id] || 0;
             const canDelete = folders.length > 1;
             const isDragging = draggingFolderId === f.id;
+            const siblingShiftY =
+              !isDragging && draggingFolderId && dragPreview
+                ? computeSiblingShiftY(
+                    index,
+                    dragPreview.initialIndex,
+                    dragPreview.hoverIndex,
+                    dragPreview.slots
+                  )
+                : 0;
 
             return (
               <div
@@ -336,11 +490,14 @@ export function ManageFoldersModal({
                   rowRefs.current[f.id] = el;
                 }}
                 data-folder-id={f.id}
+                data-dragging={isDragging ? 'true' : undefined}
                 onPointerDown={(e) => handleRowPointerDown(e, f, false)}
                 onContextMenu={(e) => e.preventDefault()}
                 style={
                   isDragging
                     ? { transform: `translateY(${dragOffsetY}px) scale(1.02)` }
+                    : siblingShiftY !== 0
+                    ? { transform: `translateY(${siblingShiftY}px)` }
                     : undefined
                 }
                 className={`p-3 rounded-2xl flex items-center justify-between gap-2 border select-none ${
@@ -350,7 +507,7 @@ export function ManageFoldersModal({
                           ? 'bg-[#33353a] border-[#a8f09b] ring-2 ring-[#a8f09b]/35'
                           : 'bg-white border-[#2e6c31] ring-2 ring-[#2e6c31]/25'
                       }`
-                    : `transition-transform duration-150 ${
+                    : `${draggingFolderId ? 'transition-transform duration-150 ' : ''}${
                         isDark ? 'bg-[#282a2f] border-white/[0.04]' : 'bg-[#f7f9f5] border-black/[0.06]'
                       }`
                 } ${folders.length > 1 ? 'cursor-grab active:cursor-grabbing' : ''}`}

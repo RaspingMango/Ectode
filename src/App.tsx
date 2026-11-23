@@ -60,6 +60,8 @@ import {
   shouldAcceptDetectedCode,
   type ScreenCaptureDetection,
 } from './utils/screenCapture';
+import { shouldSuspendCamera } from './utils/nativeCamera';
+import { isNativeLinkPlatform, openExternalUrl } from './utils/nativeLinks';
 import { Language, TRANSLATIONS, getInitialLanguage, saveLanguagePreference } from './utils/i18n';
 import { ThemeMode, getInitialTheme, applyTheme } from './utils/theme';
 
@@ -407,7 +409,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#121316] text-[#e3e2e6] flex flex-col font-sans select-none overflow-x-hidden">
+    <div className="native-camera-root min-h-screen bg-[#121316] text-[#e3e2e6] flex flex-col font-sans select-none overflow-x-hidden">
       {/* Top App Bar */}
       <header className="sticky top-0 z-30 bg-[#121316]/95 backdrop-blur-md px-4 safe-top-header pb-3 border-b border-white/[0.04]">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
@@ -500,6 +502,12 @@ export default function App() {
             lang={lang}
             theme={theme}
             demoMode={demoMode}
+            suspended={shouldSuspendCamera({
+              cleanModalOpen,
+              turnstileModalOpen,
+              folderModalOpen,
+              aboutOpen,
+            })}
             quickActionRequest={quickActionRequest}
             onQuickActionHandled={(nonce) => {
               setQuickActionRequest((prev) => (prev && prev.nonce === nonce ? null : prev));
@@ -793,7 +801,7 @@ export default function App() {
                   <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
                     theme === 'dark' ? 'bg-[#244927] text-[#a8f09b]' : 'bg-[#e8f5e9] text-[#2e6c31]'
                   }`}>
-                    v1.4.2
+                    v1.4.3
                   </span>
                 </div>
               </div>
@@ -830,6 +838,15 @@ export default function App() {
                 href="https://github.com/RaspingMango/Ectode"
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={(e) => {
+                  if (!isNativeLinkPlatform()) return;
+                  e.preventDefault();
+                  playTapSound();
+                  void openExternalUrl('https://github.com/RaspingMango/Ectode', {
+                    mode: 'app',
+                    chooserTitle: t.githubRepoTitle,
+                  });
+                }}
                 className={`flex items-center justify-between gap-3 p-3 rounded-2xl transition-colors border ${
                   theme === 'dark'
                     ? 'bg-[#282a2f] hover:bg-[#33353a] border-white/[0.06] text-[#e3e2e6]'

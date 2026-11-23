@@ -13,6 +13,8 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(NativeDownloadPlugin.class);
         registerPlugin(ScreenCapturePlugin.class);
         registerPlugin(QuickActionPlugin.class);
+        registerPlugin(NativeCameraPlugin.class);
+        registerPlugin(NativeLinkPlugin.class);
         super.onCreate(savedInstanceState);
         QuickActionBridge.publishIntentIfQuickAction(getIntent());
         publishCapturedIntentIfPresent(getIntent());

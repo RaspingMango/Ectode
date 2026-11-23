@@ -119,6 +119,27 @@ if (!manifest.includes('android:name=".QuickScreenTileService"')) {
   changed = true;
 }
 
+const urlQueriesBlock = `<queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="http" />
+        </intent>
+    </queries>`;
+
+if (!manifest.includes('<queries>')) {
+  manifest = manifest.replace(
+    /(<\/manifest>)/,
+    `    ${urlQueriesBlock}\n$1`
+  );
+  changed = true;
+}
+
 if (changed) {
   fs.writeFileSync(manifestPath, manifest, 'utf8');
   console.log('[setup-android-manifest] Updated AndroidManifest.xml permissions and services.');
@@ -129,7 +150,7 @@ if (changed) {
 // Sync versionName in android/app/build.gradle with package.json version when present
 if (fs.existsSync(buildGradlePath) && fs.existsSync(pkgPath)) {
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-  const appVersion = typeof pkg.version === 'string' && pkg.version !== '0.0.0' ? pkg.version : '1.4.2';
+  const appVersion = typeof pkg.version === 'string' && pkg.version !== '0.0.0' ? pkg.version : '1.4.3';
   const gradle = fs.readFileSync(buildGradlePath, 'utf8');
   const nextGradle = gradle.replace(/versionName\s+"[^"]*"/, `versionName "${appVersion}"`);
   if (nextGradle !== gradle) {
