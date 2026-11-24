@@ -6,7 +6,6 @@ import {
   ExternalLink,
   Smartphone,
   Globe,
-  Palette,
   Maximize2,
   Check,
   CheckCircle2,
@@ -15,15 +14,19 @@ import {
   Phone,
   Mail,
   User,
+  UserPlus,
+  MessageSquare,
+  Search,
+  KeyRound,
   Ticket,
   CreditCard,
   FileText,
   Star,
   Barcode,
+  Pencil,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import {
-  BARCODE_FORMATS,
   CodeFormat,
   DownloadImageFormat,
   Folder,
@@ -34,7 +37,6 @@ import {
   parseQrContent,
   resolveSafeCodeFormat,
   suggestFolderForType,
-  validateBarcodePayload,
 } from '../utils/qrLogic';
 import { generateQrDataUrl, downloadQr, copyQrToClipboard, QrRenderOptions } from '../utils/qrRenderer';
 import { TurnstileModal } from './TurnstileModal';
@@ -49,16 +51,30 @@ import {
 } from '../utils/i18n';
 import { ThemeMode } from '../utils/theme';
 import { FolderSelect } from './FolderSelect';
-import { CodeColorPicker } from './CodeColorPicker';
 import { DownloadButton } from './DownloadButton';
 import {
   UrlInspectionResult,
+  addContactToDevice,
   inspectExternalUrl,
   isNativeLinkPlatform,
+  openDeviceWifiSettings,
   openExternalUrl,
   resolveLinkActionPresentation,
   sanitizeExternalUrl,
 } from '../utils/nativeLinks';
+import { CodeEditorDraft, buildCodeEditorDraft } from '../utils/codeEditor';
+import {
+  QuickActionKind,
+  buildMailtoUri,
+  buildSmsUri,
+  buildTelUri,
+  buildWebSearchUrl,
+  extractCleanEmail,
+  extractCleanPhoneNumber,
+  extractContactDraft,
+  extractWifiQuickInfo,
+  getPlannedQuickActionKinds,
+} from '../utils/scannedActions';
 
 interface CleanQrModalProps {
   isOpen: boolean;
@@ -72,6 +88,7 @@ interface CleanQrModalProps {
   theme?: ThemeMode;
   defaultDownloadFormat?: DownloadImageFormat;
   onSaveToGallery: (item: Omit<StoredQrItem, 'id' | 'createdAt'>, existingId?: string) => void;
+  onEditCode: (draft: CodeEditorDraft) => void;
   onShowToast?: (message: string) => void;
 }
 
@@ -87,23 +104,22 @@ export function CleanQrModal({
   theme = 'dark',
   defaultDownloadFormat = 'png',
   onSaveToGallery,
+  onEditCode,
   onShowToast,
 }: CleanQrModalProps) {
   const isDark = theme === 'dark';
   const t = TRANSLATIONS[lang];
-  const initialSafeFormat = resolveSafeCodeFormat(
+  const safeFormat = resolveSafeCodeFormat(
     rawContent || '',
     existingItem?.codeFormat || codeFormat || 'QR_CODE'
   );
-  const [activeFormat, setActiveFormat] = useState<CodeFormat>(initialSafeFormat);
-  const safeFormat = resolveSafeCodeFormat(rawContent || '', activeFormat);
-  const [parsed, setParsed] = useState<ParsedQrData>(() => parseQrContent(rawContent || '', initialSafeFormat));
+  const [parsed, setParsed] = useState<ParsedQrData>(() => parseQrContent(rawContent || '', safeFormat));
   const [dataUrl, setDataUrl] = useState<string>('');
-  const [fgColor, setFgColor] = useState('#000000');
-  const [bgColor, setBgColor] = useState('#ffffff');
-  const [ecc, setEcc] = useState<'L' | 'M' | 'Q' | 'H'>('M');
   const [showTurnstile, setShowTurnstile] = useState(false);
-  const [showStyleSettings, setShowStyleSettings] = useState(false);
+
+  const fgColor = existingItem?.style?.fgColor || '#000000';
+  const bgColor = existingItem?.style?.bgColor || '#ffffff';
+  const ecc: 'L' | 'M' | 'Q' | 'H' = existingItem?.style?.ecc || 'M';
 
   // Form State
   const [title, setTitle] = useState('');
@@ -111,6 +127,7 @@ export function CleanQrModal({
   const [notes, setNotes] = useState('');
   const [isFavorite, setIsFavorite] = useState(false);
   const [isCopiedText, setIsCopiedText] = useState(false);
+  const [copiedQuickKey, setCopiedQuickKey] = useState<string | null>(null);
   const [isCopiedImage, setIsCopiedImage] = useState(false);
   const [isDownloaded, setIsDownloaded] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -120,21 +137,10 @@ export function CleanQrModal({
   const safeActionUrl = sanitizeExternalUrl(parsed.actionUrl);
   const nativeLinkEnabled = isNativeLinkPlatform();
 
-  const compatibleFormats = useMemo<CodeFormat[]>(() => {
-    if (!rawContent) return ['QR_CODE'];
-    const valid1D = BARCODE_FORMATS.filter((fmt) => validateBarcodePayload(rawContent, fmt).valid);
-    return ['QR_CODE', ...valid1D];
-  }, [rawContent]);
-
   useEffect(() => {
     if (!isOpen || !rawContent) return;
 
-    const initialFormat = resolveSafeCodeFormat(
-      rawContent,
-      existingItem?.codeFormat || codeFormat || 'QR_CODE'
-    );
-    setActiveFormat(initialFormat);
-    const parsedData = parseQrContent(rawContent, initialFormat);
+    const parsedData = parseQrContent(rawContent, safeFormat);
     setParsed(parsedData);
 
     if (existingItem) {
@@ -142,28 +148,13 @@ export function CleanQrModal({
       setFolderId(existingItem.folderId);
       setNotes(existingItem.notes || '');
       setIsFavorite(existingItem.isFavorite);
-      if (existingItem.style) {
-        setEcc(existingItem.style.ecc || 'M');
-        setFgColor(existingItem.style.fgColor || '#000000');
-        setBgColor(existingItem.style.bgColor || '#ffffff');
-      } else {
-        setFgColor('#000000');
-        setBgColor('#ffffff');
-      }
     } else {
       setTitle(parsedData.displayTitle);
       setFolderId(suggestFolderForType(parsedData.type));
       setNotes('');
       setIsFavorite(false);
-      setFgColor('#000000');
-      setBgColor('#ffffff');
     }
-  }, [isOpen, rawContent, codeFormat, existingItem]);
-
-  useEffect(() => {
-    if (!isOpen || !rawContent) return;
-    setParsed(parseQrContent(rawContent, safeFormat));
-  }, [isOpen, rawContent, safeFormat]);
+  }, [isOpen, rawContent, safeFormat, existingItem]);
 
   useEffect(() => {
     if (!isOpen || !safeActionUrl || !nativeLinkEnabled) {
@@ -205,7 +196,7 @@ export function CleanQrModal({
     const renderOpts: QrRenderOptions = {
       fgColor,
       bgColor,
-      ecc: ecc,
+      ecc,
       margin: 2,
       width: 720,
       codeFormat: safeFormat,
@@ -222,21 +213,48 @@ export function CleanQrModal({
     };
   }, [isOpen, rawContent, fgColor, bgColor, ecc, safeFormat]);
 
+  const contactDraft = useMemo(() => extractContactDraft(rawContent, parsed), [rawContent, parsed]);
+  const cleanPhone = useMemo(() => extractCleanPhoneNumber(rawContent, parsed), [rawContent, parsed]);
+  const cleanEmail = useMemo(() => extractCleanEmail(rawContent, parsed), [rawContent, parsed]);
+  const wifiInfo = useMemo(
+    () => (parsed.type === 'wifi' ? extractWifiQuickInfo(rawContent) : null),
+    [rawContent, parsed.type]
+  );
+
+  const plannedActions = useMemo<QuickActionKind[]>(
+    () =>
+      getPlannedQuickActionKinds({
+        rawContent,
+        parsed,
+        hasSafeActionUrl: Boolean(safeActionUrl),
+        showSecondaryBrowserButton: Boolean(nativeLinkEnabled && linkAction.showSecondaryBrowserButton),
+        isNativeAndroid: nativeLinkEnabled,
+      }),
+    [rawContent, parsed, safeActionUrl, nativeLinkEnabled, linkAction.showSecondaryBrowserButton]
+  );
+
   if (!isOpen || !rawContent) return null;
 
   const currentFolder = folders.find((f) => f.id === folderId) || folders[0];
   const currentFolderName = getLocalizedFolderName(currentFolder.id, currentFolder.name, lang);
 
-  const handleCopyText = async () => {
+  const copyTextValue = async (value: string, key: string, toastMessage?: string) => {
     playTapSound();
     try {
-      await navigator.clipboard.writeText(rawContent);
-      setIsCopiedText(true);
-      setTimeout(() => setIsCopiedText(false), 2000);
+      await navigator.clipboard.writeText(value);
+      setCopiedQuickKey(key);
+      if (key === 'raw') setIsCopiedText(true);
+      if (toastMessage) onShowToast?.(toastMessage);
+      setTimeout(() => {
+        setCopiedQuickKey((prev) => (prev === key ? null : prev));
+        if (key === 'raw') setIsCopiedText(false);
+      }, 2000);
     } catch {
-      // Fallback
+      // Clipboard fallback ignored
     }
   };
+
+  const handleCopyText = () => copyTextValue(rawContent, 'raw');
 
   const handleCopyImage = async () => {
     playTapSound();
@@ -302,6 +320,37 @@ export function CleanQrModal({
     }
   };
 
+  const handleEditClick = () => {
+    playTapSound();
+    const draft = buildCodeEditorDraft({
+      rawContent,
+      codeFormat: safeFormat,
+      existingItem,
+      title,
+      folderId,
+      notes,
+      isFavorite,
+      source: existingItem?.source || source,
+      fgColor,
+      bgColor,
+      ecc,
+    });
+    onEditCode(draft);
+  };
+
+  const handleAddContact = async () => {
+    if (!contactDraft) return;
+    playTapSound();
+    const result = await addContactToDevice(contactDraft);
+    if (result === 'opened') {
+      onShowToast?.(t.contactOpenedToast);
+    } else if (result === 'downloaded') {
+      onShowToast?.(t.contactVcfSavedToast);
+    } else {
+      onShowToast?.(t.contactOpenFailedToast);
+    }
+  };
+
   const handleSave = () => {
     playTapSound();
     triggerHaptic([30, 20, 50]);
@@ -361,25 +410,359 @@ export function CleanQrModal({
     }
   };
 
+  const primaryActionBtnClass = `w-full min-h-[44px] py-3 px-4 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-sm whitespace-nowrap ${
+    isDark
+      ? 'bg-[#244927] hover:bg-[#2f5c33] text-[#c4fbb8]'
+      : 'bg-[#e8f5e9] hover:bg-[#d7eed9] text-[#1b5e20]'
+  }`;
+
+  const secondaryActionBtnClass = `min-h-[44px] py-2.5 px-3 rounded-2xl text-xs font-semibold flex items-center justify-center gap-2 transition-colors active:scale-[0.98] border whitespace-nowrap ${
+    isDark
+      ? 'bg-[#282a2f] hover:bg-[#33353a] text-[#e3e2e6] border-white/[0.04]'
+      : 'bg-[#eef1ec] hover:bg-[#e2e6df] text-[#191c19] border-black/[0.06]'
+  }`;
+
+  const renderQuickActionItem = (kind: QuickActionKind, isPrimarySlot: boolean, extraClass = '') => {
+    const btnClass = `${isPrimarySlot ? primaryActionBtnClass : secondaryActionBtnClass} ${extraClass}`.trim();
+    const iconAccent = isPrimarySlot
+      ? isDark
+        ? 'text-[#a8f09b]'
+        : 'text-[#2e6c31]'
+      : isDark
+        ? 'text-[#c4c7c5]'
+        : 'text-[#404943]';
+
+    switch (kind) {
+      case 'add_contact':
+        return (
+          <button key={kind} type="button" onClick={handleAddContact} className={btnClass}>
+            <UserPlus className={`w-4 h-4 shrink-0 ${iconAccent}`} />
+            <span className="truncate">{t.addToContacts}</span>
+          </button>
+        );
+
+      case 'call_phone': {
+        if (!cleanPhone) return null;
+        const telHref = buildTelUri(cleanPhone);
+        if (nativeLinkEnabled) {
+          return (
+            <button
+              key={kind}
+              type="button"
+              onClick={async () => {
+                playTapSound();
+                const res = await openExternalUrl(telHref, { mode: 'system' });
+                if (!res.opened) onShowToast?.(t.unableToOpenLink);
+              }}
+              className={btnClass}
+            >
+              <Phone className={`w-4 h-4 shrink-0 ${iconAccent}`} />
+              <span className="truncate">{t.callNumber}</span>
+            </button>
+          );
+        }
+        return (
+          <a key={kind} href={telHref} onClick={playTapSound} className={btnClass}>
+            <Phone className={`w-4 h-4 shrink-0 ${iconAccent}`} />
+            <span className="truncate">{t.callNumber}</span>
+          </a>
+        );
+      }
+
+      case 'send_sms': {
+        if (!cleanPhone) return null;
+        const smsHref = buildSmsUri(cleanPhone);
+        if (nativeLinkEnabled) {
+          return (
+            <button
+              key={kind}
+              type="button"
+              onClick={async () => {
+                playTapSound();
+                const res = await openExternalUrl(smsHref, { mode: 'system' });
+                if (!res.opened) onShowToast?.(t.unableToOpenLink);
+              }}
+              className={btnClass}
+            >
+              <MessageSquare className={`w-4 h-4 shrink-0 ${iconAccent}`} />
+              <span className="truncate">{t.sendSms}</span>
+            </button>
+          );
+        }
+        return (
+          <a key={kind} href={smsHref} onClick={playTapSound} className={btnClass}>
+            <MessageSquare className={`w-4 h-4 shrink-0 ${iconAccent}`} />
+            <span className="truncate">{t.sendSms}</span>
+          </a>
+        );
+      }
+
+      case 'send_email': {
+        if (!cleanEmail) return null;
+        const mailHref = buildMailtoUri(cleanEmail);
+        if (nativeLinkEnabled) {
+          return (
+            <button
+              key={kind}
+              type="button"
+              onClick={async () => {
+                playTapSound();
+                const res = await openExternalUrl(mailHref, { mode: 'system' });
+                if (!res.opened) onShowToast?.(t.unableToOpenLink);
+              }}
+              className={btnClass}
+            >
+              <Mail className={`w-4 h-4 shrink-0 ${iconAccent}`} />
+              <span className="truncate">{t.sendEmail}</span>
+            </button>
+          );
+        }
+        return (
+          <a key={kind} href={mailHref} onClick={playTapSound} className={btnClass}>
+            <Mail className={`w-4 h-4 shrink-0 ${iconAccent}`} />
+            <span className="truncate">{t.sendEmail}</span>
+          </a>
+        );
+      }
+
+      case 'copy_wifi_password': {
+        if (!wifiInfo?.password) return null;
+        const copied = copiedQuickKey === 'wifi_pass';
+        return (
+          <button
+            key={kind}
+            type="button"
+            onClick={() => copyTextValue(wifiInfo.password, 'wifi_pass', t.wifiPassCopiedToast)}
+            className={btnClass}
+          >
+            {copied ? (
+              <Check className={`w-4 h-4 shrink-0 ${iconAccent}`} />
+            ) : (
+              <KeyRound className={`w-4 h-4 shrink-0 ${iconAccent}`} />
+            )}
+            <span className="truncate">{copied ? t.copiedText : t.copyWifiPassword}</span>
+          </button>
+        );
+      }
+
+      case 'copy_wifi_ssid': {
+        if (!wifiInfo?.ssid) return null;
+        const copied = copiedQuickKey === 'wifi_ssid';
+        return (
+          <button
+            key={kind}
+            type="button"
+            onClick={() => copyTextValue(wifiInfo.ssid, 'wifi_ssid', t.wifiSsidCopiedToast)}
+            className={btnClass}
+          >
+            {copied ? (
+              <Check className={`w-4 h-4 shrink-0 ${iconAccent}`} />
+            ) : (
+              <Wifi className={`w-4 h-4 shrink-0 ${iconAccent}`} />
+            )}
+            <span className="truncate">{copied ? t.copiedText : t.copyWifiSsid}</span>
+          </button>
+        );
+      }
+
+      case 'open_wifi_settings':
+        return (
+          <button
+            key={kind}
+            type="button"
+            onClick={async () => {
+              playTapSound();
+              const opened = await openDeviceWifiSettings();
+              if (!opened) onShowToast?.(t.unableToOpenLink);
+            }}
+            className={btnClass}
+          >
+            <Wifi className={`w-4 h-4 shrink-0 ${iconAccent}`} />
+            <span className="truncate">{t.wifiSettingsBtn}</span>
+          </button>
+        );
+
+      case 'open_link_app': {
+        if (!safeActionUrl) return null;
+        if (nativeLinkEnabled) {
+          return (
+            <button
+              key={kind}
+              type="button"
+              onClick={async () => {
+                playTapSound();
+                const res = await openExternalUrl(safeActionUrl, {
+                  mode: linkAction.mode,
+                  packageName: linkAction.targetPackageName,
+                  chooserTitle: linkAction.primaryLabel,
+                });
+                if (!res.opened) onShowToast?.(t.unableToOpenLink);
+              }}
+              className={btnClass}
+            >
+              {linkAction.mode === 'app' ? (
+                <Smartphone className={`w-4 h-4 shrink-0 ${iconAccent}`} />
+              ) : (
+                <ExternalLink className={`w-4 h-4 shrink-0 ${iconAccent}`} />
+              )}
+              <span className="truncate">{linkAction.primaryLabel}</span>
+            </button>
+          );
+        }
+        return (
+          <a
+            key={kind}
+            href={safeActionUrl}
+            target="_blank"
+            rel="noreferrer"
+            onClick={playTapSound}
+            className={btnClass}
+          >
+            <ExternalLink className={`w-4 h-4 shrink-0 ${iconAccent}`} />
+            <span className="truncate">{linkAction.primaryLabel}</span>
+          </a>
+        );
+      }
+
+      case 'open_link_browser':
+        if (!safeActionUrl) return null;
+        return (
+          <button
+            key={kind}
+            type="button"
+            onClick={async () => {
+              playTapSound();
+              const res = await openExternalUrl(safeActionUrl, {
+                mode: 'browser',
+                chooserTitle: t.openInBrowser,
+              });
+              if (!res.opened) onShowToast?.(t.unableToOpenLink);
+            }}
+            title={t.openInBrowserTooltip}
+            aria-label={t.openInBrowser}
+            className={btnClass}
+          >
+            <Globe className={`w-4 h-4 shrink-0 ${iconAccent}`} />
+            <span className="truncate">{t.openInBrowserShort}</span>
+          </button>
+        );
+
+      case 'copy_link': {
+        const copied = copiedQuickKey === 'link';
+        return (
+          <button
+            key={kind}
+            type="button"
+            onClick={() => copyTextValue(rawContent, 'link')}
+            className={btnClass}
+          >
+            {copied ? (
+              <Check className={`w-4 h-4 shrink-0 ${iconAccent}`} />
+            ) : (
+              <Copy className={`w-4 h-4 shrink-0 ${iconAccent}`} />
+            )}
+            <span className="truncate">{copied ? t.copiedText : t.copyLink}</span>
+          </button>
+        );
+      }
+
+      case 'search_web': {
+        const searchUrl = buildWebSearchUrl(rawContent);
+        if (nativeLinkEnabled) {
+          return (
+            <button
+              key={kind}
+              type="button"
+              onClick={async () => {
+                playTapSound();
+                const res = await openExternalUrl(searchUrl, {
+                  mode: 'browser',
+                  chooserTitle: t.searchOnline,
+                });
+                if (!res.opened) onShowToast?.(t.unableToOpenLink);
+              }}
+              className={btnClass}
+            >
+              <Search className={`w-4 h-4 shrink-0 ${iconAccent}`} />
+              <span className="truncate">{t.searchOnline}</span>
+            </button>
+          );
+        }
+        return (
+          <a
+            key={kind}
+            href={searchUrl}
+            target="_blank"
+            rel="noreferrer"
+            onClick={playTapSound}
+            className={btnClass}
+          >
+            <Search className={`w-4 h-4 shrink-0 ${iconAccent}`} />
+            <span className="truncate">{t.searchOnline}</span>
+          </a>
+        );
+      }
+
+      case 'copy_text':
+      default: {
+        const valueToCopy =
+          parsed.type === 'phone' && cleanPhone
+            ? cleanPhone
+            : parsed.type === 'email' && cleanEmail
+              ? cleanEmail
+              : rawContent;
+        const label =
+          parsed.type === 'phone'
+            ? t.copyPhone
+            : parsed.type === 'email'
+              ? t.copyEmail
+              : t.copyText;
+        const copied = copiedQuickKey === 'quick_copy';
+        return (
+          <button
+            key={kind}
+            type="button"
+            onClick={() => copyTextValue(valueToCopy, 'quick_copy')}
+            className={btnClass}
+          >
+            {copied ? (
+              <Check className={`w-4 h-4 shrink-0 ${iconAccent}`} />
+            ) : (
+              <Copy className={`w-4 h-4 shrink-0 ${iconAccent}`} />
+            )}
+            <span className="truncate">{copied ? t.copiedText : label}</span>
+          </button>
+        );
+      }
+    }
+  };
+
+  const primaryQuickAction = plannedActions[0] ?? null;
+  const secondaryQuickActions = plannedActions.slice(1);
+
   return (
     <>
-      <div 
+      <div
         className="fixed inset-0 z-40 bg-black/70 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto animate-in fade-in duration-200"
         role="dialog"
         aria-label="Clean Code View"
       >
-        <div className={`w-full sm:max-w-lg rounded-t-[32px] sm:rounded-[32px] shadow-2xl flex flex-col max-h-[92vh] overflow-hidden border ${
-          isDark ? 'bg-[#1e1f23] text-[#e3e2e6] border-white/[0.06]' : 'bg-white text-[#191c19] border-black/[0.08]'
-        }`}>
+        <div
+          className={`w-full sm:max-w-lg rounded-t-[32px] sm:rounded-[32px] shadow-2xl flex flex-col max-h-[92vh] overflow-hidden border ${
+            isDark ? 'bg-[#1e1f23] text-[#e3e2e6] border-white/[0.06]' : 'bg-white text-[#191c19] border-black/[0.08]'
+          }`}
+        >
           {/* M3 Drag Handle Bar on Mobile */}
           <div className={`w-10 h-1 rounded-full mx-auto mt-2.5 sm:hidden ${isDark ? 'bg-white/20' : 'bg-black/20'}`} />
 
           {/* Header */}
-          <div className={`px-6 py-4 border-b flex items-center justify-between sticky top-0 z-10 backdrop-blur ${
-            isDark ? 'bg-[#1e1f23]/95 border-white/[0.04]' : 'bg-white/95 border-black/[0.06]'
-          }`}>
+          <div
+            className={`px-6 py-4 border-b flex items-center justify-between sticky top-0 z-10 backdrop-blur ${
+              isDark ? 'bg-[#1e1f23]/95 border-white/[0.04]' : 'bg-white/95 border-black/[0.06]'
+            }`}
+          >
             <div className="flex items-center gap-2.5">
-              <div className={`w-3 h-3 rounded-full ${isDark ? 'bg-[#a8f09b] shadow-[0_0_8px_#a8f09b]' : 'bg-[#2e6c31]'}`} />
+              {getTypeIcon()}
               <div>
                 <h3 className={`font-bold text-base leading-tight ${isDark ? 'text-[#e3e2e6]' : 'text-[#191c19]'}`}>
                   {isBarcode ? t.cleanBarcodeModalTitle : t.cleanModalTitle}
@@ -391,12 +774,15 @@ export function CleanQrModal({
             </div>
 
             <button
+              type="button"
               onClick={() => {
                 playTapSound();
                 onClose();
               }}
-              className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
-                isDark ? 'bg-white/[0.04] hover:bg-white/[0.08] text-[#c4c7c5] hover:text-white' : 'bg-black/[0.04] hover:bg-black/[0.08] text-[#575a56] hover:text-[#191c19]'
+              className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                isDark
+                  ? 'bg-white/[0.04] hover:bg-white/[0.08] text-[#c4c7c5] hover:text-white'
+                  : 'bg-black/[0.04] hover:bg-black/[0.08] text-[#575a56] hover:text-[#191c19]'
               }`}
               aria-label="Close"
             >
@@ -405,12 +791,15 @@ export function CleanQrModal({
           </div>
 
           {/* Scrollable Content */}
-          <div className="p-6 overflow-y-auto space-y-5">
+          <div className="p-5 sm:p-6 overflow-y-auto space-y-4">
             {/* Pristine Reconstructed Code Card */}
-            <div className={`flex flex-col items-center rounded-[24px] p-5 relative border ${
-              isDark ? 'bg-[#1a1b1f] border-white/[0.04]' : 'bg-[#f7f9f5] border-black/[0.06]'
-            }`}>
+            <div
+              className={`flex flex-col items-center rounded-[24px] p-5 relative border ${
+                isDark ? 'bg-[#1a1b1f] border-white/[0.04]' : 'bg-[#f7f9f5] border-black/[0.06]'
+              }`}
+            >
               <button
+                type="button"
                 onClick={() => {
                   playTapSound();
                   setShowTurnstile(true);
@@ -426,9 +815,9 @@ export function CleanQrModal({
                 <span>{t.fullScreenTurnstile}</span>
               </button>
 
-              <div 
+              <div
                 className={`rounded-3xl transition-all shadow-xl my-2 border border-black/10 flex items-center justify-center ${
-                  isBarcode ? 'w-full max-w-[320px] px-4 py-5 mt-8' : 'p-4'
+                  isBarcode ? 'w-full max-w-[320px] px-4 py-5 mt-8' : 'p-4 mt-7 sm:mt-5'
                 }`}
                 style={{ backgroundColor: bgColor }}
               >
@@ -439,31 +828,30 @@ export function CleanQrModal({
                     className={
                       isBarcode
                         ? 'w-full h-36 sm:h-40 object-contain'
-                        : 'w-52 h-52 sm:w-60 sm:h-60 object-contain image-rendering-pixelated'
+                        : 'w-48 h-48 sm:w-56 sm:h-56 object-contain image-rendering-pixelated'
                     }
                   />
                 ) : (
-                  <div className={isBarcode ? 'w-full h-36 flex items-center justify-center' : 'w-52 h-52 flex items-center justify-center'}>
+                  <div className={isBarcode ? 'w-full h-36 flex items-center justify-center' : 'w-48 h-48 flex items-center justify-center'}>
                     <div className={`w-8 h-8 border-3 ${isDark ? 'border-[#a8f09b]' : 'border-[#2e6c31]'} border-t-transparent rounded-full animate-spin`} />
                   </div>
                 )}
               </div>
 
-              <div className="flex items-center gap-2 mt-2 flex-wrap justify-center">
-                <span className={`text-[11px] font-bold px-3 py-0.5 rounded-full ${
-                  isDark ? 'text-[#a8f09b] bg-[#244927]' : 'text-[#1b5e20] bg-[#e8f5e9]'
-                }`}>
+              <div className="flex items-center gap-2 mt-2 flex-wrap justify-center text-xs text-[#8e918f]">
+                <span className={`font-semibold ${isDark ? 'text-[#a8f09b]' : 'text-[#2e6c31]'}`}>
                   {t.vectorOriginalBadge}
                 </span>
-                <span className="text-[11px] text-[#8e918f]">
+                <span aria-hidden="true">·</span>
+                <span>
                   {isBarcode
                     ? `${t.formatBadgeLabel}: ${getBarcodeFormatLabel(safeFormat)}`
                     : `${t.eccCorrection}: ${ecc}`}
                 </span>
               </div>
 
-              {/* M3 Actions Row */}
-              <div className="grid grid-cols-3 gap-2 w-full mt-4 pt-3.5 border-t border-white/[0.04]">
+              {/* Media & Edit Actions Row */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-1.5 w-full mt-4 pt-3.5 border-t border-white/[0.04]">
                 <DownloadButton
                   defaultFormat={defaultDownloadFormat}
                   onDownload={handleDownload}
@@ -472,122 +860,78 @@ export function CleanQrModal({
                   menuPlacement="bottom"
                   lang={lang}
                   theme={theme}
+                  className="h-full"
                 />
                 <button
+                  type="button"
                   onClick={handleCopyImage}
-                  className="flex flex-col items-center justify-center py-2.5 px-2 rounded-2xl bg-[#282a2f] hover:bg-[#33353a] active:scale-95 text-[#e3e2e6] text-xs font-semibold transition-colors"
+                  className="flex flex-col items-center justify-center py-2.5 px-2 sm:px-1 rounded-2xl bg-[#282a2f] hover:bg-[#33353a] active:scale-95 text-[#e3e2e6] text-xs sm:text-[11px] font-semibold transition-colors"
                 >
                   {isCopiedImage ? (
                     <Check className={`w-4 h-4 mb-1 ${isDark ? 'text-[#a8f09b]' : 'text-[#2e6c31]'}`} />
                   ) : (
                     <Copy className={`w-4 h-4 mb-1 ${isDark ? 'text-[#d0bcff]' : 'text-[#6d28d9]'}`} />
                   )}
-                  {isCopiedImage ? t.copiedImage : t.copyImage}
+                  <span className="leading-tight truncate max-w-full">
+                    {isCopiedImage ? t.copiedImage : t.copyImage}
+                  </span>
                 </button>
                 <button
+                  type="button"
                   onClick={handleShare}
-                  className="flex flex-col items-center justify-center py-2.5 px-2 rounded-2xl bg-[#282a2f] hover:bg-[#33353a] active:scale-95 text-[#e3e2e6] text-xs font-semibold transition-colors"
+                  className="flex flex-col items-center justify-center py-2.5 px-2 sm:px-1 rounded-2xl bg-[#282a2f] hover:bg-[#33353a] active:scale-95 text-[#e3e2e6] text-xs sm:text-[11px] font-semibold transition-colors"
                 >
                   <Share2 className={`w-4 h-4 mb-1 ${isDark ? 'text-[#ffdcc2]' : 'text-[#b45309]'}`} />
-                  {t.shareQr}
+                  <span className="leading-tight truncate max-w-full">{t.shareQr}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleEditClick}
+                  className="flex flex-col items-center justify-center py-2.5 px-2 sm:px-1 rounded-2xl bg-[#282a2f] hover:bg-[#33353a] active:scale-95 text-[#e3e2e6] text-xs sm:text-[11px] font-semibold transition-colors"
+                >
+                  <Pencil className={`w-4 h-4 mb-1 ${isDark ? 'text-[#a8f09b]' : 'text-[#2e6c31]'}`} />
+                  <span className="leading-tight truncate max-w-full">{t.editCodeBtn}</span>
                 </button>
               </div>
             </div>
 
-            {/* Customization Drawer Toggle */}
-            <div className="bg-[#1a1b1f] rounded-[24px] overflow-hidden border border-white/[0.04]">
-              <button
-                type="button"
-                onClick={() => setShowStyleSettings(!showStyleSettings)}
-                className={`w-full px-5 py-3.5 flex items-center justify-between text-xs font-semibold text-[#c4c7c5] transition-colors ${
-                  isDark ? 'hover:text-white' : 'hover:text-[#191c19]'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <Palette className={`w-4 h-4 ${isDark ? 'text-[#a8f09b]' : 'text-[#2e6c31]'}`} />
-                  <span>{isBarcode ? t.customizeBarcodeStyle : t.customizeStyle}</span>
+            {/* Prominent Contextual Quick Actions */}
+            {primaryQuickAction && (
+              <div className="bg-[#1a1b1f] rounded-[24px] p-5 space-y-3 border border-white/[0.04]">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-[#e3e2e6]">
+                    {t.quickActionsHeader}
+                  </span>
+                  <span className="text-xs font-medium text-[#8e918f]">
+                    {isBarcode ? getBarcodeFormatLabel(safeFormat) : parsed.type.toUpperCase()}
+                  </span>
                 </div>
-                <span className="text-[11px] text-[#8e918f]">
-                  {showStyleSettings ? '▲' : '▼'}
-                </span>
-              </button>
 
-              {showStyleSettings && (
-                <div className="p-5 pt-3 border-t border-white/[0.04] space-y-3.5">
-                  <CodeColorPicker
-                    fgColor={fgColor}
-                    bgColor={bgColor}
-                    onChange={({ fgColor: nextFg, bgColor: nextBg }) => {
-                      setFgColor(nextFg);
-                      setBgColor(nextBg);
-                    }}
-                    lang={lang}
-                    theme={theme}
-                    label={t.paletteLabel}
-                  />
+                {renderQuickActionItem(primaryQuickAction, true)}
 
-                  {compatibleFormats.length > 1 && (
-                    <div>
-                      <label className="text-[11px] font-medium text-[#8e918f] block mb-2">
-                        {t.barcodeFormatLabel}
-                      </label>
-                      <div className="flex flex-wrap gap-2">
-                        {compatibleFormats.map((fmt) => (
-                          <button
-                            key={fmt}
-                            type="button"
-                            onClick={() => {
-                              playTapSound();
-                              setActiveFormat(fmt);
-                            }}
-                            className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${
-                              activeFormat === fmt
-                                ? isDark
-                                  ? 'bg-[#a8f09b] text-[#0b3810] shadow-sm'
-                                  : 'bg-[#2e6c31] text-white shadow-sm'
-                                : `bg-[#282a2f] text-[#c4c7c5] ${isDark ? 'hover:text-white' : 'hover:text-[#191c19]'}`
-                            }`}
-                          >
-                            {getBarcodeFormatLabel(fmt)}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                {secondaryQuickActions.length > 0 && (
+                  <div
+                    className={`grid gap-2 ${
+                      secondaryQuickActions.length === 1
+                        ? 'grid-cols-1'
+                        : secondaryQuickActions.length === 3
+                          ? 'grid-cols-2 sm:grid-cols-3'
+                          : 'grid-cols-2'
+                    }`}
+                  >
+                    {secondaryQuickActions.map((actionKind, idx) =>
+                      renderQuickActionItem(
+                        actionKind,
+                        false,
+                        secondaryQuickActions.length === 3 && idx === 2 ? 'col-span-2 sm:col-span-1' : ''
+                      )
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
-                  {!isBarcode && (
-                    <div>
-                      <label className="text-[11px] font-medium text-[#8e918f] block mb-2">
-                        {t.eccLabel}
-                      </label>
-                      <div className="grid grid-cols-4 gap-2">
-                        {(['L', 'M', 'Q', 'H'] as const).map((lvl) => (
-                          <button
-                            key={lvl}
-                            type="button"
-                            onClick={() => {
-                              playTapSound();
-                              setEcc(lvl);
-                            }}
-                            className={`py-2 rounded-full text-xs font-bold transition-colors ${
-                              ecc === lvl
-                                ? isDark
-                                  ? 'bg-[#a8f09b] text-[#0b3810] shadow-sm'
-                                  : 'bg-[#2e6c31] text-white shadow-sm'
-                                : `bg-[#282a2f] text-[#c4c7c5] ${isDark ? 'hover:text-white' : 'hover:text-[#191c19]'}`
-                            }`}
-                          >
-                            {lvl} {lvl === 'H' ? '(Max)' : ''}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Decoded Content & Action Panel */}
+            {/* Decoded Content Details */}
             <div className="bg-[#1a1b1f] rounded-[24px] p-5 space-y-3 border border-white/[0.04]">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-xs font-bold text-[#c4c7c5]">
@@ -597,6 +941,7 @@ export function CleanQrModal({
                   </span>
                 </div>
                 <button
+                  type="button"
                   onClick={handleCopyText}
                   className={`text-xs hover:underline flex items-center gap-1 font-semibold ${
                     isDark ? 'text-[#a8f09b]' : 'text-[#2e6c31]'
@@ -622,87 +967,15 @@ export function CleanQrModal({
                 </div>
               )}
 
-              <div className={`p-3 rounded-2xl text-xs font-mono break-all max-h-24 overflow-y-auto select-all border ${
-                isDark
-                  ? 'bg-[#121316] text-[#c4c7c5] border-white/[0.04]'
-                  : 'bg-[#eef1ec] text-[#191c19] border-black/[0.06]'
-              }`}>
+              <div
+                className={`p-3 rounded-2xl text-xs font-mono break-all max-h-24 overflow-y-auto select-all border ${
+                  isDark
+                    ? 'bg-[#121316] text-[#c4c7c5] border-white/[0.04]'
+                    : 'bg-[#eef1ec] text-[#191c19] border-black/[0.06]'
+                }`}
+              >
                 {rawContent}
               </div>
-
-              {safeActionUrl && (
-                nativeLinkEnabled ? (
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        playTapSound();
-                        const res = await openExternalUrl(safeActionUrl, {
-                          mode: linkAction.mode,
-                          packageName: linkAction.targetPackageName,
-                          chooserTitle: linkAction.primaryLabel,
-                        });
-                        if (!res.opened) {
-                          onShowToast?.(t.unableToOpenLink);
-                        }
-                      }}
-                      className={`flex-1 min-w-0 py-3 px-4 rounded-full text-xs font-bold flex items-center justify-center gap-2 transition-colors active:scale-95 shadow-sm ${
-                        isDark
-                          ? 'bg-[#244927] hover:bg-[#2f5c33] text-[#c4fbb8]'
-                          : 'bg-[#e8f5e9] hover:bg-[#d7eed9] text-[#1b5e20]'
-                      }`}
-                    >
-                      {linkAction.mode === 'app' ? (
-                        <Smartphone className={`w-4 h-4 shrink-0 ${isDark ? 'text-[#a8f09b]' : 'text-[#2e6c31]'}`} />
-                      ) : (
-                        <ExternalLink className={`w-4 h-4 shrink-0 ${isDark ? 'text-[#a8f09b]' : 'text-[#2e6c31]'}`} />
-                      )}
-                      <span className="truncate">{linkAction.primaryLabel}</span>
-                    </button>
-
-                    {linkAction.showSecondaryBrowserButton && (
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          playTapSound();
-                          const res = await openExternalUrl(safeActionUrl, {
-                            mode: 'browser',
-                            chooserTitle: t.openInBrowser,
-                          });
-                          if (!res.opened) {
-                            onShowToast?.(t.unableToOpenLink);
-                          }
-                        }}
-                        title={t.openInBrowserTooltip}
-                        aria-label={t.openInBrowser}
-                        className={`shrink-0 py-3 px-4 rounded-full text-xs font-semibold flex items-center justify-center gap-1.5 border transition-colors active:scale-95 ${
-                          isDark
-                            ? 'bg-[#282a2f] hover:bg-[#33353a] text-[#e3e2e6] border-white/[0.08]'
-                            : 'bg-[#f7f9f5] hover:bg-[#e8ece6] text-[#191c19] border-black/[0.08]'
-                        }`}
-                      >
-                        <Globe className={`w-3.5 h-3.5 shrink-0 ${isDark ? 'text-[#c4c7c5]' : 'text-[#404943]'}`} />
-                        <span>{t.openInBrowserShort}</span>
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <a
-                    href={safeActionUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={playTapSound}
-                    className={`w-full py-3 px-4 rounded-full text-xs font-bold flex items-center justify-center gap-2 transition-colors active:scale-95 shadow-sm ${
-                      isDark
-                        ? 'bg-[#244927] hover:bg-[#2f5c33] text-[#c4fbb8]'
-                        : 'bg-[#e8f5e9] hover:bg-[#d7eed9] text-[#1b5e20]'
-                    }`}
-                  >
-                    <ExternalLink className={`w-4 h-4 ${isDark ? 'text-[#a8f09b]' : 'text-[#2e6c31]'}`} />
-                    <span>{linkAction.primaryLabel}</span>
-                  </a>
-                )
-              )}
             </div>
 
             {/* Gallery Save & Organize Form */}
@@ -776,9 +1049,11 @@ export function CleanQrModal({
           </div>
 
           {/* Sticky Bottom Actions */}
-          <div className={`px-4 pt-4 safe-bottom-sheet border-t sticky bottom-0 z-10 flex gap-2.5 ${
-            isDark ? 'bg-[#1e1f23] border-white/[0.04]' : 'bg-white border-black/[0.06]'
-          }`}>
+          <div
+            className={`px-4 pt-4 safe-bottom-sheet border-t sticky bottom-0 z-10 flex gap-2.5 ${
+              isDark ? 'bg-[#1e1f23] border-white/[0.04]' : 'bg-white border-black/[0.06]'
+            }`}
+          >
             <button
               type="button"
               onClick={onClose}

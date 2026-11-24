@@ -30,6 +30,7 @@ import {
   stripDemoItems,
   reorderFolders,
 } from './utils/qrLogic';
+import type { CodeEditorDraft } from './utils/codeEditor';
 import {
   SEED_ITEMS,
   loadStoredQrItems,
@@ -42,8 +43,17 @@ import {
   saveShowGalleryBadge,
   loadDownloadFormat,
   saveDownloadFormat,
+  loadSoundEnabled,
+  saveSoundEnabled,
+  loadHapticEnabled,
+  saveHapticEnabled,
 } from './utils/storage';
-import { playScanSuccessSound, playTapSound, triggerHaptic } from './utils/audio';
+import {
+  playScanSuccessSound,
+  playTapSound,
+  setAudioPreferences,
+  triggerHaptic,
+} from './utils/audio';
 import { saveFileToDevice } from './utils/nativeFiles';
 import {
   addQuickActionListener,
@@ -76,7 +86,11 @@ export default function App() {
   const [demoMode, setDemoMode] = useState<boolean>(() => loadDemoMode());
   const [showGalleryBadge, setShowGalleryBadge] = useState<boolean>(() => loadShowGalleryBadge());
   const [downloadFormat, setDownloadFormat] = useState<DownloadImageFormat>(() => loadDownloadFormat());
-  const [hapticEnabled, setHapticEnabled] = useState(true);
+  const [hapticEnabled, setHapticEnabled] = useState<boolean>(() => {
+    const initial = loadHapticEnabled();
+    setAudioPreferences({ hapticEnabled: initial });
+    return initial;
+  });
 
   const t = TRANSLATIONS[lang];
 
@@ -87,6 +101,11 @@ export default function App() {
   const [scannedSource, setScannedSource] = useState<'camera' | 'screen' | 'file' | 'generated'>('camera');
   const [selectedItemForModal, setSelectedItemForModal] = useState<StoredQrItem | null>(null);
 
+  // Code editor draft state (from CleanQrModal "Edit" button)
+  const [editingDraft, setEditingDraft] = useState<CodeEditorDraft | null>(null);
+  const [editorSessionKey, setEditorSessionKey] = useState<number>(0);
+  const [editReturnTab, setEditReturnTab] = useState<AppTab>('scanner');
+
   // Turnstile quick view modal
   const [turnstileModalOpen, setTurnstileModalOpen] = useState(false);
   const [turnstileTarget, setTurnstileTarget] = useState<StoredQrItem | null>(null);
@@ -96,7 +115,11 @@ export default function App() {
   const [editingFolder, setEditingFolder] = useState<Folder | null>(null);
 
   // Sound FX toggle
-  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
+    const initial = loadSoundEnabled();
+    setAudioPreferences({ soundEnabled: initial });
+    return initial;
+  });
 
   // About modal
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -126,6 +149,16 @@ export default function App() {
   useEffect(() => {
     document.documentElement.lang = lang;
   }, [lang]);
+
+  useEffect(() => {
+    saveSoundEnabled(soundEnabled);
+    setAudioPreferences({ soundEnabled });
+  }, [soundEnabled]);
+
+  useEffect(() => {
+    saveHapticEnabled(hapticEnabled);
+    setAudioPreferences({ hapticEnabled });
+  }, [hapticEnabled]);
 
   useEffect(() => {
     return () => {
@@ -315,6 +348,23 @@ export default function App() {
     setTurnstileModalOpen(true);
   };
 
+  // Switch from CleanQrModal to dedicated code editor page
+  const handleEditCodeFromModal = (draft: CodeEditorDraft) => {
+    setEditReturnTab(activeTab === 'generator' ? editReturnTab : activeTab);
+    setCleanModalOpen(false);
+    setEditingDraft(draft);
+    setEditorSessionKey((prev) => prev + 1);
+    setActiveTab('generator');
+  };
+
+  const handleCancelEdit = () => {
+    setEditingDraft(null);
+    setActiveTab(editReturnTab);
+    if (scannedRawContent) {
+      setCleanModalOpen(true);
+    }
+  };
+
   // Save or update an item in gallery
   const handleSaveToGallery = (
     itemData: Omit<StoredQrItem, 'id' | 'createdAt'>,
@@ -383,7 +433,9 @@ export default function App() {
       : activeTab === 'gallery'
         ? t.tabGallery
         : activeTab === 'generator'
-          ? t.tabCreate
+          ? editingDraft
+            ? t.tabEdit
+            : t.tabCreate
           : t.tabSettings;
 
   const handleExportBackup = async () => {
@@ -446,6 +498,7 @@ export default function App() {
             <button
               onClick={() => {
                 playTapSound();
+                setEditingDraft(null);
                 setActiveTab('settings');
               }}
               className={`w-10 h-10 rounded-full flex items-center justify-center transition-all border ${
@@ -464,12 +517,20 @@ export default function App() {
             {/* Sound Toggle */}
             <button
               onClick={() => {
-                playTapSound();
-                setSoundEnabled(!soundEnabled);
+                const next = !soundEnabled;
+                saveSoundEnabled(next);
+                setAudioPreferences({ soundEnabled: next });
+                setSoundEnabled(next);
+                if (next) {
+                  playTapSound();
+                } else {
+                  triggerHaptic(12);
+                }
               }}
               className="w-10 h-10 rounded-full bg-[#1e1f23] hover:bg-[#282a2f] active:scale-95 flex items-center justify-center text-[#c4c7c5] hover:text-[#e3e2e6] transition-all border border-white/[0.04]"
               title={soundEnabled ? t.soundOn : t.soundOff}
               aria-label={soundEnabled ? t.soundOn : t.soundOff}
+              aria-pressed={soundEnabled}
             >
               {soundEnabled ? (
                 <Volume2 className={`w-4 h-4 ${theme === 'dark' ? 'text-[#a8f09b]' : 'text-[#2e6c31]'}`} />
@@ -538,19 +599,32 @@ export default function App() {
             onReorderFolders={handleReorderFolders}
             onExportBackup={handleExportBackup}
             onImportBackup={handleImportBackup}
-            onNavigateToScan={() => setActiveTab('scanner')}
-            onNavigateToCreate={() => setActiveTab('generator')}
+            onNavigateToScan={() => {
+              setEditingDraft(null);
+              setActiveTab('scanner');
+            }}
+            onNavigateToCreate={() => {
+              setEditingDraft(null);
+              setEditorSessionKey((prev) => prev + 1);
+              setActiveTab('generator');
+            }}
           />
         )}
 
         {activeTab === 'generator' && (
           <GeneratorView
+            key={editingDraft ? `edit-${editorSessionKey}` : `create-${editorSessionKey}`}
             folders={folders}
             lang={lang}
             theme={theme}
             defaultDownloadFormat={downloadFormat}
+            editDraft={editingDraft}
+            onCancelEdit={handleCancelEdit}
             onSaveToGallery={handleSaveToGallery}
-            onOpenGallery={() => setActiveTab('gallery')}
+            onOpenGallery={() => {
+              setEditingDraft(null);
+              setActiveTab('gallery');
+            }}
             onShowToast={showToast}
           />
         )}
@@ -562,9 +636,19 @@ export default function App() {
             theme={theme}
             onThemeChange={(newTheme) => setTheme(newTheme)}
             soundEnabled={soundEnabled}
-            onToggleSound={() => setSoundEnabled(!soundEnabled)}
+            onToggleSound={() => {
+              const next = !soundEnabled;
+              saveSoundEnabled(next);
+              setAudioPreferences({ soundEnabled: next });
+              setSoundEnabled(next);
+            }}
             hapticEnabled={hapticEnabled}
-            onToggleHaptic={() => setHapticEnabled(!hapticEnabled)}
+            onToggleHaptic={() => {
+              const next = !hapticEnabled;
+              saveHapticEnabled(next);
+              setAudioPreferences({ hapticEnabled: next });
+              setHapticEnabled(next);
+            }}
             showGalleryBadge={showGalleryBadge}
             onToggleGalleryBadge={() => {
               setShowGalleryBadge((prev) => {
@@ -596,6 +680,7 @@ export default function App() {
           <button
             onClick={() => {
               playTapSound();
+              setEditingDraft(null);
               setActiveTab('scanner');
             }}
             className="flex flex-col items-center justify-center py-1 group"
@@ -629,6 +714,7 @@ export default function App() {
           <button
             onClick={() => {
               playTapSound();
+              setEditingDraft(null);
               setActiveTab('gallery');
             }}
             className="flex flex-col items-center justify-center py-1 group relative"
@@ -669,6 +755,8 @@ export default function App() {
           <button
             onClick={() => {
               playTapSound();
+              setEditingDraft(null);
+              setEditorSessionKey((prev) => prev + 1);
               setActiveTab('generator');
             }}
             className="flex flex-col items-center justify-center py-1 group"
@@ -702,6 +790,7 @@ export default function App() {
           <button
             onClick={() => {
               playTapSound();
+              setEditingDraft(null);
               setActiveTab('settings');
             }}
             className="flex flex-col items-center justify-center py-1 group"
@@ -748,6 +837,7 @@ export default function App() {
           theme={theme}
           defaultDownloadFormat={downloadFormat}
           onSaveToGallery={handleSaveToGallery}
+          onEditCode={handleEditCodeFromModal}
           onShowToast={showToast}
         />
       )}
@@ -801,7 +891,7 @@ export default function App() {
                   <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
                     theme === 'dark' ? 'bg-[#244927] text-[#a8f09b]' : 'bg-[#e8f5e9] text-[#2e6c31]'
                   }`}>
-                    v1.4.3
+                    v1.4.4
                   </span>
                 </div>
               </div>

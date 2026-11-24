@@ -7,6 +7,7 @@ import {
   CreditCard,
   User,
   Phone,
+  Mail,
   BookmarkPlus,
   Copy,
   Maximize2,
@@ -16,6 +17,8 @@ import {
   Barcode,
   AlertCircle,
   Wand2,
+  ArrowLeft,
+  Pencil,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import {
@@ -34,6 +37,7 @@ import {
   suggestFolderForType,
   validateBarcodePayload,
 } from '../utils/qrLogic';
+import { CodeEditorDraft, GeneratorTemplate } from '../utils/codeEditor';
 import { generateQrDataUrl, downloadQr, copyQrToClipboard } from '../utils/qrRenderer';
 import { TurnstileModal } from './TurnstileModal';
 import { playTapSound, triggerHaptic } from '../utils/audio';
@@ -49,66 +53,74 @@ interface GeneratorViewProps {
   lang?: Language;
   theme?: ThemeMode;
   defaultDownloadFormat?: DownloadImageFormat;
-  onSaveToGallery: (item: Omit<StoredQrItem, 'id' | 'createdAt'>) => void;
+  editDraft?: CodeEditorDraft | null;
+  onCancelEdit?: () => void;
+  onSaveToGallery: (item: Omit<StoredQrItem, 'id' | 'createdAt'>, existingId?: string) => void;
   onOpenGallery: () => void;
   onShowToast?: (message: string) => void;
 }
-
-type GeneratorTemplate = 'text' | 'url' | 'wifi' | 'ticket' | 'loyalty' | 'barcode' | 'vcard' | 'phone';
 
 export function GeneratorView({
   folders,
   lang = 'ru',
   theme = 'dark',
   defaultDownloadFormat = 'png',
+  editDraft = null,
+  onCancelEdit,
   onSaveToGallery,
   onOpenGallery,
   onShowToast,
 }: GeneratorViewProps) {
   const isDark = theme === 'dark';
   const t = TRANSLATIONS[lang];
-  const [template, setTemplate] = useState<GeneratorTemplate>('text');
+  const isEditMode = Boolean(editDraft);
+
+  const [template, setTemplate] = useState<GeneratorTemplate>(editDraft?.template ?? 'text');
 
   // Form Fields
-  const [textContent, setTextContent] = useState('');
-  const [urlContent, setUrlContent] = useState('https://');
+  const [textContent, setTextContent] = useState(editDraft?.textContent ?? '');
+  const [urlContent, setUrlContent] = useState(editDraft?.urlContent ?? 'https://');
 
   // Wi-Fi fields
-  const [wifiSsid, setWifiSsid] = useState('');
-  const [wifiPass, setWifiPass] = useState('');
-  const [wifiAuth, setWifiAuth] = useState<'WPA' | 'WEP' | 'nopass'>('WPA');
-  const [wifiHidden, setWifiHidden] = useState(false);
+  const [wifiSsid, setWifiSsid] = useState(editDraft?.wifiSsid ?? '');
+  const [wifiPass, setWifiPass] = useState(editDraft?.wifiPass ?? '');
+  const [wifiAuth, setWifiAuth] = useState<'WPA' | 'WEP' | 'nopass'>(editDraft?.wifiAuth ?? 'WPA');
+  const [wifiHidden, setWifiHidden] = useState(editDraft?.wifiHidden ?? false);
 
   // Ticket fields
-  const [ticketEvent, setTicketEvent] = useState('');
-  const [ticketSeat, setTicketSeat] = useState('');
-  const [ticketCode, setTicketCode] = useState('');
+  const [ticketEvent, setTicketEvent] = useState(editDraft?.ticketEvent ?? '');
+  const [ticketSeat, setTicketSeat] = useState(editDraft?.ticketSeat ?? '');
+  const [ticketCode, setTicketCode] = useState(editDraft?.ticketCode ?? '');
 
   // Loyalty card fields
-  const [loyaltyStore, setLoyaltyStore] = useState('');
-  const [loyaltyNumber, setLoyaltyNumber] = useState('');
+  const [loyaltyStore, setLoyaltyStore] = useState(editDraft?.loyaltyStore ?? '');
+  const [loyaltyNumber, setLoyaltyNumber] = useState(editDraft?.loyaltyNumber ?? '');
 
   // Barcode fields
-  const [barcodeFormat, setBarcodeFormat] = useState<CodeFormat>('CODE_128');
-  const [barcodeValue, setBarcodeValue] = useState<string>(() => getSampleBarcodeValue('CODE_128'));
+  const [barcodeFormat, setBarcodeFormat] = useState<CodeFormat>(editDraft?.barcodeFormat ?? 'CODE_128');
+  const [barcodeValue, setBarcodeValue] = useState<string>(
+    () => editDraft?.barcodeValue ?? getSampleBarcodeValue('CODE_128')
+  );
 
   // vCard fields
-  const [vcardName, setVcardName] = useState('');
-  const [vcardPhone, setVcardPhone] = useState('');
-  const [vcardEmail, setVcardEmail] = useState('');
-  const [vcardOrg, setVcardOrg] = useState('');
+  const [vcardName, setVcardName] = useState(editDraft?.vcardName ?? '');
+  const [vcardPhone, setVcardPhone] = useState(editDraft?.vcardPhone ?? '');
+  const [vcardEmail, setVcardEmail] = useState(editDraft?.vcardEmail ?? '');
+  const [vcardOrg, setVcardOrg] = useState(editDraft?.vcardOrg ?? '');
 
-  // Phone field
-  const [phoneNumber, setPhoneNumber] = useState('');
+  // Phone & Email fields
+  const [phoneNumber, setPhoneNumber] = useState(editDraft?.phoneNumber ?? '');
+  const [emailAddress, setEmailAddress] = useState(editDraft?.emailAddress ?? '');
 
   // Metadata & Customization
-  const [customTitle, setCustomTitle] = useState('');
-  const [titleManuallyEdited, setTitleManuallyEdited] = useState(false);
-  const [selectedFolderId, setSelectedFolderId] = useState('docs');
-  const [notes, setNotes] = useState('');
-  const [fgColor, setFgColor] = useState('#000000');
-  const [bgColor, setBgColor] = useState('#ffffff');
-  const [ecc, setEcc] = useState<'L' | 'M' | 'Q' | 'H'>('M');
+  const [customTitle, setCustomTitle] = useState(editDraft?.title ?? '');
+  const [titleManuallyEdited, setTitleManuallyEdited] = useState(Boolean(editDraft?.title));
+  const [selectedFolderId, setSelectedFolderId] = useState(editDraft?.folderId ?? 'docs');
+  const [folderManuallyEdited, setFolderManuallyEdited] = useState(Boolean(editDraft?.folderId));
+  const [notes, setNotes] = useState(editDraft?.notes ?? '');
+  const [fgColor, setFgColor] = useState(editDraft?.fgColor ?? '#000000');
+  const [bgColor, setBgColor] = useState(editDraft?.bgColor ?? '#ffffff');
+  const [ecc, setEcc] = useState<'L' | 'M' | 'Q' | 'H'>(editDraft?.ecc ?? 'M');
 
   // Status & Previews
   const [previewDataUrl, setPreviewDataUrl] = useState<string>('');
@@ -176,6 +188,8 @@ export function GeneratorView({
         );
       case 'phone':
         return `tel:${phoneNumber.replace(/\s+/g, '')}`;
+      case 'email':
+        return `mailto:${emailAddress.trim()}`;
       default:
         return textContent.trim() || 'Ectode QR';
     }
@@ -199,6 +213,7 @@ export function GeneratorView({
     vcardEmail,
     vcardOrg,
     phoneNumber,
+    emailAddress,
     lang,
   ]);
 
@@ -233,9 +248,14 @@ export function GeneratorView({
     } else if (template === 'phone') {
       type = 'phone';
       defaultTitle = phoneNumber ? `Tel: ${phoneNumber}` : (lang === 'ru' ? 'Телефон' : 'Phone');
+    } else if (template === 'email') {
+      type = 'email';
+      defaultTitle = emailAddress ? `Email: ${emailAddress}` : 'Email';
     }
 
-    setSelectedFolderId(suggestFolderForType(type));
+    if (!folderManuallyEdited) {
+      setSelectedFolderId(suggestFolderForType(type));
+    }
     if (!titleManuallyEdited) {
       setCustomTitle(defaultTitle);
     }
@@ -249,9 +269,11 @@ export function GeneratorView({
     barcodeValue,
     vcardName,
     phoneNumber,
+    emailAddress,
     urlContent,
     textContent,
     titleManuallyEdited,
+    folderManuallyEdited,
     lang,
   ]);
 
@@ -300,22 +322,26 @@ export function GeneratorView({
     }
     if (template === 'vcard') dataType = 'vcard';
     if (template === 'phone') dataType = 'phone';
+    if (template === 'email') dataType = 'email';
 
-    onSaveToGallery({
-      title: customTitle.trim() || 'Ectode',
-      rawContent: rawQrString,
-      folderId: selectedFolderId,
-      dataType,
-      codeFormat: activeCodeFormat,
-      notes: notes.trim(),
-      isFavorite: false,
-      source: 'generated',
-      style: {
-        fgColor,
-        bgColor,
-        ecc,
+    onSaveToGallery(
+      {
+        title: customTitle.trim() || 'Ectode',
+        rawContent: rawQrString,
+        folderId: selectedFolderId,
+        dataType,
+        codeFormat: activeCodeFormat,
+        notes: notes.trim(),
+        isFavorite: editDraft?.isFavorite ?? false,
+        source: editDraft?.source ?? 'generated',
+        style: {
+          fgColor,
+          bgColor,
+          ecc,
+        },
       },
-    });
+      editDraft?.existingId
+    );
 
     try {
       confetti({
@@ -377,10 +403,54 @@ export function GeneratorView({
     { id: 'barcode', label: t.templateBarcode, icon: Barcode },
     { id: 'vcard', label: t.templateContact, icon: User },
     { id: 'phone', label: t.templatePhone, icon: Phone },
+    { id: 'email', label: t.templateEmail, icon: Mail },
   ] as const;
 
   return (
     <div className="flex flex-col h-full w-full max-w-4xl mx-auto px-4 py-2 space-y-4">
+      {/* Edit Mode Header Bar */}
+      {isEditMode && (
+        <div
+          className={`flex items-center justify-between gap-3 px-4 py-3 rounded-[24px] border ${
+            isDark
+              ? 'bg-[#1e1f23] border-[#a8f09b]/20 text-[#e3e2e6]'
+              : 'bg-white border-[#2e6c31]/20 text-[#191c19]'
+          }`}
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <div
+              className={`w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 ${
+                isDark ? 'bg-[#244927] text-[#a8f09b]' : 'bg-[#e8f5e9] text-[#2e6c31]'
+              }`}
+            >
+              <Pencil className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-bold leading-tight truncate">{t.editModeBannerTitle}</div>
+              <div className="text-[11px] text-[#8e918f] truncate">{t.editModeBannerDesc}</div>
+            </div>
+          </div>
+
+          {onCancelEdit && (
+            <button
+              type="button"
+              onClick={() => {
+                playTapSound();
+                onCancelEdit();
+              }}
+              className={`shrink-0 px-3.5 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-colors active:scale-95 ${
+                isDark
+                  ? 'bg-[#282a2f] hover:bg-[#33353a] text-[#e3e2e6]'
+                  : 'bg-[#eef1ec] hover:bg-[#e2e6df] text-[#191c19]'
+              }`}
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>{t.cancelEditBtn}</span>
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Material You 3 Filter Chips for Templates */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
         {templatesList.map((tItem) => {
@@ -389,6 +459,7 @@ export function GeneratorView({
           return (
             <button
               key={tItem.id}
+              type="button"
               onClick={() => {
                 playTapSound();
                 setTemplate(tItem.id);
@@ -635,11 +706,13 @@ export function GeneratorView({
               </div>
 
               {barcodeErrorText && (
-                <div className={`p-3 rounded-2xl text-xs flex items-center gap-2 border ${
-                  isDark
-                    ? 'bg-[#371e1d] text-[#ffdad6] border-[#ffb4ab]/20'
-                    : 'bg-[#fde8e8] text-[#690005] border-[#b3261e]/20'
-                }`}>
+                <div
+                  className={`p-3 rounded-2xl text-xs flex items-center gap-2 border ${
+                    isDark
+                      ? 'bg-[#371e1d] text-[#ffdad6] border-[#ffb4ab]/20'
+                      : 'bg-[#fde8e8] text-[#690005] border-[#b3261e]/20'
+                  }`}
+                >
                   <AlertCircle className={`w-4 h-4 shrink-0 ${isDark ? 'text-[#ffb4ab]' : 'text-[#b3261e]'}`} />
                   <span>{barcodeErrorText}</span>
                 </div>
@@ -719,6 +792,21 @@ export function GeneratorView({
             </div>
           )}
 
+          {template === 'email' && (
+            <div>
+              <label className="text-xs font-semibold text-[#c4c7c5] block mb-1.5">
+                {t.enterEmailLabel}
+              </label>
+              <input
+                type="email"
+                value={emailAddress}
+                onChange={(e) => setEmailAddress(e.target.value)}
+                placeholder="name@example.com"
+                className="w-full px-4 py-3 rounded-2xl bg-[#282a2f] text-sm text-[#e3e2e6] placeholder:text-[#8e918f] focus:outline-none focus:ring-2 focus:ring-[#a8f09b] border-none"
+              />
+            </div>
+          )}
+
           {/* Organizing fields (Title, Folder, Notes) */}
           <div className="pt-3 border-t border-white/[0.04] space-y-3.5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -745,7 +833,10 @@ export function GeneratorView({
                 <FolderSelect
                   folders={folders}
                   selectedFolderId={selectedFolderId}
-                  onSelectFolder={setSelectedFolderId}
+                  onSelectFolder={(nextId) => {
+                    setSelectedFolderId(nextId);
+                    setFolderManuallyEdited(true);
+                  }}
                   lang={lang}
                   theme={theme}
                   ariaLabel={t.folderLabel}
@@ -776,6 +867,7 @@ export function GeneratorView({
               {t.liveVectorPreview}
             </span>
             <button
+              type="button"
               onClick={() => {
                 if (!canGenerate) return;
                 playTapSound();
@@ -825,12 +917,12 @@ export function GeneratorView({
             <span className="text-xs text-[#8e918f] font-medium">
               {isBarcodeMode
                 ? `${getBarcodeFormatLabel(activeCodeFormat)} • ${t.pristineVectorQuality}`
-                : t.pristineVectorQuality}
+                : `${t.pristineVectorQuality} • ${t.eccCorrection}: ${ecc}`}
             </span>
           </div>
 
-          {/* Material You Palette & Custom RGB Picker */}
-          <div className="bg-[#1a1b1f] rounded-[24px] p-3.5 border border-white/[0.04]">
+          {/* Material You Palette, Custom RGB Picker & ECC */}
+          <div className="bg-[#1a1b1f] rounded-[24px] p-3.5 border border-white/[0.04] space-y-3.5">
             <CodeColorPicker
               fgColor={fgColor}
               bgColor={bgColor}
@@ -842,11 +934,41 @@ export function GeneratorView({
               theme={theme}
               compactPresets
             />
+
+            {!isBarcodeMode && (
+              <div className="pt-2.5 border-t border-white/[0.04]">
+                <label className="text-[11px] font-medium text-[#8e918f] block mb-2">
+                  {t.eccLabel}
+                </label>
+                <div className="grid grid-cols-4 gap-2">
+                  {(['L', 'M', 'Q', 'H'] as const).map((lvl) => (
+                    <button
+                      key={lvl}
+                      type="button"
+                      onClick={() => {
+                        playTapSound();
+                        setEcc(lvl);
+                      }}
+                      className={`py-2 rounded-full text-xs font-bold transition-colors ${
+                        ecc === lvl
+                          ? isDark
+                            ? 'bg-[#a8f09b] text-[#0b3810] shadow-sm'
+                            : 'bg-[#2e6c31] text-white shadow-sm'
+                          : `bg-[#282a2f] text-[#c4c7c5] ${isDark ? 'hover:text-white' : 'hover:text-[#191c19]'}`
+                      }`}
+                    >
+                      {lvl} {lvl === 'H' ? '(Max)' : ''}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Export & Save Action Buttons */}
           <div className="space-y-2.5 pt-2">
             <button
+              type="button"
               onClick={handleSave}
               disabled={savedSuccess || !canGenerate}
               className={`w-full py-3.5 px-5 rounded-full font-bold text-sm flex items-center justify-center gap-2 shadow-md active:scale-95 disabled:opacity-40 transition-all ${
@@ -858,12 +980,12 @@ export function GeneratorView({
               {savedSuccess ? (
                 <>
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>{t.savedToGalleryGen}</span>
+                  <span>{editDraft?.existingId ? t.changesSavedToast : t.savedToGalleryGen}</span>
                 </>
               ) : (
                 <>
                   <BookmarkPlus className="w-4 h-4" />
-                  <span>{t.saveToGalleryGen}</span>
+                  <span>{editDraft?.existingId ? t.saveChangesBtn : t.saveToGalleryGen}</span>
                 </>
               )}
             </button>
@@ -880,6 +1002,7 @@ export function GeneratorView({
                 theme={theme}
               />
               <button
+                type="button"
                 onClick={handleCopyImage}
                 disabled={!canGenerate}
                 className="py-2.5 px-3 rounded-2xl bg-[#282a2f] hover:bg-[#33353a] disabled:opacity-40 text-[#e3e2e6] text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"

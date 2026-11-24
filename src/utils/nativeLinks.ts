@@ -1,6 +1,7 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import type { Language } from './i18n';
 import type { ParsedQrData } from './qrLogic';
+import { ContactDraft, buildContactVcfContent } from './scannedActions';
 
 export interface LinkAppHandler {
   packageName: string;
@@ -29,6 +30,8 @@ interface NativeLinkPluginInterface {
     packageName?: string;
     chooserTitle?: string;
   }): Promise<OpenUrlResult>;
+  addContact(options: ContactDraft): Promise<OpenUrlResult>;
+  openWifiSettings(): Promise<OpenUrlResult>;
 }
 
 const NativeLink = registerPlugin<NativeLinkPluginInterface>('NativeLink');
@@ -221,5 +224,50 @@ export async function openExternalUrl(
     });
   } catch {
     return { opened: false, reason: 'error' };
+  }
+}
+
+export async function addContactToDevice(
+  contact: ContactDraft
+): Promise<'opened' | 'downloaded' | 'failed'> {
+  if (isNativeLinkPlatform()) {
+    try {
+      const res = await NativeLink.addContact(contact);
+      if (res.opened) {
+        return 'opened';
+      }
+    } catch {
+      // Fall back to .vcf card download
+    }
+  }
+
+  try {
+    const vcf = buildContactVcfContent(contact);
+    const blob = new Blob([vcf], { type: 'text/vcard;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    const safeName = (contact.name || contact.phone || contact.email || 'contact')
+      .trim()
+      .replace(/[^a-zA-Zа-яА-ЯёЁ0-9_-]+/g, '_')
+      .replace(/^_+|_+$/g, '') || 'contact';
+    anchor.href = url;
+    anchor.download = `${safeName}.vcf`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return 'downloaded';
+  } catch {
+    return 'failed';
+  }
+}
+
+export async function openDeviceWifiSettings(): Promise<boolean> {
+  if (!isNativeLinkPlatform()) return false;
+  try {
+    const res = await NativeLink.openWifiSettings();
+    return Boolean(res.opened);
+  } catch {
+    return false;
   }
 }

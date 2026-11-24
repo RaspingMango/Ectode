@@ -210,7 +210,7 @@ export function DownloadButton({
             : ''
         } ${
           layout === 'tile'
-            ? 'flex flex-col items-center justify-center py-2.5 px-2 rounded-2xl text-xs font-semibold'
+            ? 'h-full flex flex-col items-center justify-center py-2.5 px-2 sm:px-1 rounded-2xl text-xs sm:text-[11px] font-semibold'
             : 'py-2.5 px-3 rounded-2xl text-xs font-semibold flex items-center justify-center gap-1.5'
         }`}
       >

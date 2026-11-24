@@ -22,7 +22,7 @@ import {
 import { Language, TRANSLATIONS } from '../utils/i18n';
 import { ThemeMode } from '../utils/theme';
 import { DownloadImageFormat, DOWNLOAD_IMAGE_FORMATS } from '../utils/qrLogic';
-import { playTapSound, triggerHaptic } from '../utils/audio';
+import { playTapSound, setAudioPreferences, triggerHaptic } from '../utils/audio';
 import {
   isQuickTilesNativePlatform,
   requestPinQuickTile,
@@ -428,8 +428,14 @@ export function SettingsView({
           <button
             type="button"
             onClick={() => {
-              playTapSound();
+              const next = !soundEnabled;
+              setAudioPreferences({ soundEnabled: next });
               onToggleSound();
+              if (next) {
+                playTapSound();
+              } else {
+                triggerHaptic(12);
+              }
             }}
             className={`w-12 h-7 rounded-full transition-colors relative p-1 ${
               soundEnabled
@@ -437,6 +443,7 @@ export function SettingsView({
                 : isDark ? 'bg-[#33353a]' : 'bg-[#e0e4dd]'
             }`}
             aria-label={t.soundTitle}
+            aria-pressed={soundEnabled}
           >
             <div
               className={`w-5 h-5 rounded-full transition-transform ${
@@ -473,8 +480,10 @@ export function SettingsView({
           <button
             type="button"
             onClick={() => {
-              playTapSound();
+              const next = !hapticEnabled;
+              setAudioPreferences({ hapticEnabled: next });
               onToggleHaptic();
+              playTapSound();
             }}
             className={`w-12 h-7 rounded-full transition-colors relative p-1 ${
               hapticEnabled
@@ -482,6 +491,7 @@ export function SettingsView({
                 : isDark ? 'bg-[#33353a]' : 'bg-[#e0e4dd]'
             }`}
             aria-label={t.hapticTitle}
+            aria-pressed={hapticEnabled}
           >
             <div
               className={`w-5 h-5 rounded-full transition-transform ${
@@ -653,7 +663,7 @@ export function SettingsView({
             <Info className={`w-5 h-5 ${isDark ? 'text-[#a8f09b]' : 'text-[#2e6c31]'}`} />
             <div>
               <div className="text-xs font-bold">
-                Ectode • {t.appVersion} 1.4.3
+                Ectode • {t.appVersion} 1.4.4
               </div>
               <p className={`text-[10px] ${isDark ? 'text-[#8e918f]' : 'text-[#575a56]'}`}>
                 Offline First • Private

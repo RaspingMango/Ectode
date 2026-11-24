@@ -309,7 +309,7 @@ export function GalleryView({
           })}
         </div>
 
-        {/* Pinned Folder Actions: Always visible without horizontal scrolling */}
+        {/* Pinned Folder Actions: Icon-only circles on mobile portrait, icon + label on sm+ */}
         <div className={`flex items-center gap-1.5 shrink-0 pb-1 pl-2 border-l ${
           isDark ? 'border-white/[0.08]' : 'border-black/[0.08]'
         }`}>
@@ -319,7 +319,7 @@ export function GalleryView({
               playTapSound();
               onOpenCreateFolder();
             }}
-            className={`h-8 px-2.5 sm:px-3 rounded-full text-xs font-semibold whitespace-nowrap border border-dashed transition-colors flex items-center gap-1.5 shrink-0 ${
+            className={`h-8 w-8 sm:w-auto px-0 sm:px-3 rounded-full text-xs font-semibold whitespace-nowrap border border-dashed transition-colors flex items-center justify-center sm:gap-1.5 shrink-0 ${
               isDark
                 ? 'bg-[#1e1f23] border-[#a8f09b]/50 text-[#a8f09b] hover:bg-[#a8f09b]/10'
                 : 'bg-white border-[#2e6c31]/50 text-[#2e6c31] hover:bg-[#2e6c31]/10'
@@ -327,7 +327,7 @@ export function GalleryView({
             aria-label={t.newFolderChip}
             title={t.newFolderChip}
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="w-4 h-4 sm:w-3.5 sm:h-3.5 shrink-0" />
             <span className="hidden sm:inline">{t.newFolderChip}</span>
           </button>
 
@@ -337,7 +337,7 @@ export function GalleryView({
               playTapSound();
               setManageFoldersOpen(true);
             }}
-            className={`h-8 px-3 rounded-full text-xs font-bold whitespace-nowrap transition-colors flex items-center gap-1.5 shrink-0 border ${
+            className={`h-8 w-8 sm:w-auto px-0 sm:px-3 rounded-full text-xs font-bold whitespace-nowrap transition-colors flex items-center justify-center sm:gap-1.5 shrink-0 border ${
               isDark
                 ? 'bg-[#244927] hover:bg-[#2f5c33] text-[#c4fbb8] border-[#a8f09b]/25'
                 : 'bg-[#e8f5e9] hover:bg-[#d7eed9] text-[#1b5e20] border-[#2e6c31]/25'
@@ -345,8 +345,8 @@ export function GalleryView({
             aria-label={t.manageFoldersTitle}
             title={t.manageFoldersTitle}
           >
-            <FolderCog className="w-3.5 h-3.5" />
-            <span>{t.manageFoldersBtn}</span>
+            <FolderCog className="w-4 h-4 sm:w-3.5 sm:h-3.5 shrink-0" />
+            <span className="hidden sm:inline">{t.manageFoldersBtn}</span>
           </button>
         </div>
       </div>

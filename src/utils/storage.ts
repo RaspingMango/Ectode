@@ -15,6 +15,8 @@ const LEGACY_DEMO_MODE_KEY = 'ecode_demo_mode_v1';
 const STORAGE_SHOW_GALLERY_BADGE_KEY = 'ectode_show_gallery_badge_v1';
 const LEGACY_SHOW_GALLERY_BADGE_KEY = 'ecode_show_gallery_badge_v1';
 const STORAGE_DOWNLOAD_FORMAT_KEY = 'ectode_download_format_v1';
+export const STORAGE_SOUND_ENABLED_KEY = 'ectode_sound_enabled_v1';
+export const STORAGE_HAPTIC_ENABLED_KEY = 'ectode_haptic_enabled_v1';
 
 export const SEED_ITEMS: StoredQrItem[] = [
   {
@@ -182,4 +184,59 @@ export function saveDownloadFormat(format: DownloadImageFormat): void {
   }
 }
 
+export interface KeyValueStorageLike {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+}
 
+export function parseBooleanSetting(raw: string | null, defaultValue: boolean): boolean {
+  if (raw === 'true') return true;
+  if (raw === 'false') return false;
+  return defaultValue;
+}
+
+function resolveDefaultStorage(storage?: KeyValueStorageLike): KeyValueStorageLike | null {
+  if (storage) return storage;
+  if (typeof localStorage !== 'undefined') return localStorage;
+  return null;
+}
+
+export function loadSoundEnabled(storage?: KeyValueStorageLike): boolean {
+  try {
+    const store = resolveDefaultStorage(storage);
+    if (!store) return true;
+    return parseBooleanSetting(store.getItem(STORAGE_SOUND_ENABLED_KEY), true);
+  } catch {
+    return true;
+  }
+}
+
+export function saveSoundEnabled(enabled: boolean, storage?: KeyValueStorageLike): void {
+  try {
+    const store = resolveDefaultStorage(storage);
+    if (!store) return;
+    store.setItem(STORAGE_SOUND_ENABLED_KEY, enabled ? 'true' : 'false');
+  } catch (e) {
+    console.error('Failed to save sound setting to localStorage:', e);
+  }
+}
+
+export function loadHapticEnabled(storage?: KeyValueStorageLike): boolean {
+  try {
+    const store = resolveDefaultStorage(storage);
+    if (!store) return true;
+    return parseBooleanSetting(store.getItem(STORAGE_HAPTIC_ENABLED_KEY), true);
+  } catch {
+    return true;
+  }
+}
+
+export function saveHapticEnabled(enabled: boolean, storage?: KeyValueStorageLike): void {
+  try {
+    const store = resolveDefaultStorage(storage);
+    if (!store) return;
+    store.setItem(STORAGE_HAPTIC_ENABLED_KEY, enabled ? 'true' : 'false');
+  } catch (e) {
+    console.error('Failed to save haptic setting to localStorage:', e);
+  }
+}

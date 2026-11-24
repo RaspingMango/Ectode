@@ -8,6 +8,8 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.net.Uri;
 import android.os.Build;
+import android.provider.ContactsContract;
+import android.provider.Settings;
 
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
@@ -151,6 +153,94 @@ public class NativeLinkPlugin extends Plugin {
             } catch (Exception e) {
                 call.reject("Failed to open URL: " + e.getMessage(), e);
             }
+        });
+    }
+
+    @PluginMethod
+    public void addContact(PluginCall call) {
+        final Activity activity = getActivity();
+        if (activity == null) {
+            call.reject("Activity not available");
+            return;
+        }
+
+        final String name = call.getString("name", "");
+        final String phone = call.getString("phone", "");
+        final String email = call.getString("email", "");
+        final String org = call.getString("org", "");
+
+        activity.runOnUiThread(() -> {
+            try {
+                Intent intent = new Intent(Intent.ACTION_INSERT);
+                intent.setType(ContactsContract.Contacts.CONTENT_TYPE);
+                if (name != null && !name.trim().isEmpty()) {
+                    intent.putExtra(ContactsContract.Intents.Insert.NAME, name.trim());
+                }
+                if (phone != null && !phone.trim().isEmpty()) {
+                    intent.putExtra(ContactsContract.Intents.Insert.PHONE, phone.trim());
+                }
+                if (email != null && !email.trim().isEmpty()) {
+                    intent.putExtra(ContactsContract.Intents.Insert.EMAIL, email.trim());
+                }
+                if (org != null && !org.trim().isEmpty()) {
+                    intent.putExtra(ContactsContract.Intents.Insert.COMPANY, org.trim());
+                }
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+                boolean opened;
+                try {
+                    activity.startActivity(intent);
+                    opened = true;
+                } catch (ActivityNotFoundException | SecurityException e) {
+                    opened = false;
+                }
+
+                JSObject res = new JSObject();
+                res.put("opened", opened);
+                if (!opened) {
+                    res.put("reason", "no_app");
+                }
+                call.resolve(res);
+            } catch (Exception e) {
+                call.reject("Failed to open contacts: " + e.getMessage(), e);
+            }
+        });
+    }
+
+    @PluginMethod
+    public void openWifiSettings(PluginCall call) {
+        final Activity activity = getActivity();
+        if (activity == null) {
+            call.reject("Activity not available");
+            return;
+        }
+
+        activity.runOnUiThread(() -> {
+            boolean opened = false;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                Intent panelIntent = new Intent(Settings.Panel.ACTION_WIFI);
+                panelIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                try {
+                    activity.startActivity(panelIntent);
+                    opened = true;
+                } catch (ActivityNotFoundException | SecurityException ignored) {
+                    opened = false;
+                }
+            }
+            if (!opened) {
+                Intent settingsIntent = new Intent(Settings.ACTION_WIFI_SETTINGS);
+                settingsIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                try {
+                    activity.startActivity(settingsIntent);
+                    opened = true;
+                } catch (ActivityNotFoundException | SecurityException ignored) {
+                    opened = false;
+                }
+            }
+
+            JSObject res = new JSObject();
+            res.put("opened", opened);
+            call.resolve(res);
         });
     }
 

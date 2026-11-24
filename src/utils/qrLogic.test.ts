@@ -68,6 +68,40 @@ import {
   sanitizeExternalUrl,
   shouldUseNativeLinks,
 } from './nativeLinks';
+import {
+  STORAGE_HAPTIC_ENABLED_KEY,
+  STORAGE_SOUND_ENABLED_KEY,
+  loadHapticEnabled,
+  loadSoundEnabled,
+  parseBooleanSetting,
+  saveHapticEnabled,
+  saveSoundEnabled,
+} from './storage';
+import {
+  getAudioPreferences,
+  playScanSuccessSound,
+  playTapSound,
+  setAudioPreferences,
+  triggerHaptic,
+} from './audio';
+import {
+  buildCodeEditorDraft,
+  parseContactPayload,
+  parseWifiPayload,
+  unescapeWifiField,
+} from './codeEditor';
+import {
+  buildContactVcfContent,
+  buildMailtoUri,
+  buildSmsUri,
+  buildTelUri,
+  buildWebSearchUrl,
+  extractCleanEmail,
+  extractCleanPhoneNumber,
+  extractContactDraft,
+  extractWifiQuickInfo,
+  getPlannedQuickActionKinds,
+} from './scannedActions';
 
 test('parseQrContent parses Wi-Fi payload correctly', () => {
   const raw = 'WIFI:S:Home_Network_5G;T:WPA;P:SuperSecret123;H:false;;';
@@ -696,6 +730,222 @@ test('resolveLinkActionPresentation prioritizes installed supported app with bro
   assert.equal(customDeepLink.primaryLabel, 'Open in App');
   assert.equal(customDeepLink.showSecondaryBrowserButton, false);
 });
+
+test('sound and haptic settings persist cleanly and default to true when unset or invalid', () => {
+  const backing = new Map<string, string>();
+  const mockStorage = {
+    getItem: (k: string) => (backing.has(k) ? backing.get(k)! : null),
+    setItem: (k: string, v: string) => {
+      backing.set(k, v);
+    },
+  };
+
+  assert.equal(parseBooleanSetting(null, true), true);
+  assert.equal(parseBooleanSetting('invalid', true), true);
+  assert.equal(parseBooleanSetting('false', true), false);
+  assert.equal(parseBooleanSetting('true', false), true);
+
+  // Unset defaults to enabled
+  assert.equal(loadSoundEnabled(mockStorage), true);
+  assert.equal(loadHapticEnabled(mockStorage), true);
+
+  // Saving false persists across fresh loads
+  saveSoundEnabled(false, mockStorage);
+  saveHapticEnabled(false, mockStorage);
+  assert.equal(backing.get(STORAGE_SOUND_ENABLED_KEY), 'false');
+  assert.equal(backing.get(STORAGE_HAPTIC_ENABLED_KEY), 'false');
+  assert.equal(loadSoundEnabled(mockStorage), false);
+  assert.equal(loadHapticEnabled(mockStorage), false);
+
+  // Re-enabling sound leaves haptic disabled independently
+  saveSoundEnabled(true, mockStorage);
+  assert.equal(loadSoundEnabled(mockStorage), true);
+  assert.equal(loadHapticEnabled(mockStorage), false);
+});
+
+test('audio preferences gate sound playback and navigator.vibrate calls independently', () => {
+  const originalNavigatorDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  let vibrateCalls = 0;
+  Object.defineProperty(globalThis, 'navigator', {
+    configurable: true,
+    value: {
+      vibrate: () => {
+        vibrateCalls += 1;
+        return true;
+      },
+    },
+  });
+
+  try {
+    setAudioPreferences({ soundEnabled: false, hapticEnabled: false });
+    assert.deepEqual(getAudioPreferences(), { soundEnabled: false, hapticEnabled: false });
+    playTapSound();
+    playScanSuccessSound();
+    triggerHaptic(20);
+    assert.equal(vibrateCalls, 0);
+
+    // Haptics enabled while sound muted still vibrates on scan/tap
+    setAudioPreferences({ soundEnabled: false, hapticEnabled: true });
+    triggerHaptic(15);
+    playTapSound();
+    playScanSuccessSound();
+    assert.equal(vibrateCalls, 3);
+  } finally {
+    setAudioPreferences({ soundEnabled: true, hapticEnabled: true });
+    if (originalNavigatorDescriptor) {
+      Object.defineProperty(globalThis, 'navigator', originalNavigatorDescriptor);
+    } else {
+      delete (globalThis as Record<string, unknown>).navigator;
+    }
+  }
+});
+
+test('codeEditor draft builder maps scanned/stored codes cleanly across all formats and preserves metadata', () => {
+  assert.equal(unescapeWifiField('My\\;Net\\:1\\,2\\\\'), 'My;Net:1,2\\');
+
+  const wifi = parseWifiPayload('WIFI:S:Home\\;Net;T:WPA;P:pass\\:123;H:true;;');
+  assert.deepEqual(wifi, {
+    ssid: 'Home;Net',
+    pass: 'pass:123',
+    auth: 'WPA',
+    hidden: true,
+  });
+
+  const phoneDraft = buildCodeEditorDraft({
+    rawContent: 'tel:+7 999 111-22-33',
+    codeFormat: 'QR_CODE',
+    title: 'Support',
+    folderId: 'work',
+    fgColor: '#112233',
+    bgColor: '#eeeeee',
+    ecc: 'H',
+  });
+  assert.equal(phoneDraft.template, 'phone');
+  assert.equal(phoneDraft.phoneNumber, '+7 999 111-22-33');
+  assert.equal(phoneDraft.title, 'Support');
+  assert.equal(phoneDraft.folderId, 'work');
+  assert.equal(phoneDraft.fgColor, '#112233');
+  assert.equal(phoneDraft.bgColor, '#eeeeee');
+  assert.equal(phoneDraft.ecc, 'H');
+
+  const barcodeDraft = buildCodeEditorDraft({
+    rawContent: '4607004650932',
+    codeFormat: 'EAN_13',
+  });
+  assert.equal(barcodeDraft.template, 'barcode');
+  assert.equal(barcodeDraft.barcodeFormat, 'EAN_13');
+  assert.equal(barcodeDraft.barcodeValue, '4607004650932');
+
+  const vcardRaw = buildVCardQrString('Alexey Smirnov', '+7 999 000-11-22', 'alex@ectode.app', 'Ectode');
+  const parsedContact = parseContactPayload(vcardRaw);
+  assert.deepEqual(parsedContact, {
+    name: 'Alexey Smirnov',
+    phone: '+7 999 000-11-22',
+    email: 'alex@ectode.app',
+    org: 'Ectode',
+  });
+
+  const vcardDraft = buildCodeEditorDraft({
+    rawContent: vcardRaw,
+    codeFormat: 'QR_CODE',
+    existingItem: {
+      id: 'item-1',
+      title: 'Alex Card',
+      rawContent: vcardRaw,
+      folderId: 'contacts',
+      dataType: 'vcard',
+      createdAt: 1000,
+      isFavorite: true,
+      source: 'camera',
+    },
+  });
+  assert.equal(vcardDraft.existingId, 'item-1');
+  assert.equal(vcardDraft.isFavorite, true);
+  assert.equal(vcardDraft.template, 'vcard');
+  assert.equal(vcardDraft.vcardName, 'Alexey Smirnov');
+  assert.equal(vcardDraft.vcardPhone, '+7 999 000-11-22');
+
+  const emailDraft = buildCodeEditorDraft({
+    rawContent: 'mailto:hello@ectode.app?subject=Hi',
+    codeFormat: 'QR_CODE',
+  });
+  assert.equal(emailDraft.template, 'email');
+  assert.equal(emailDraft.emailAddress, 'hello@ectode.app');
+});
+
+test('scannedActions extracts contact drafts, builds URIs/vCard, and orders quick actions per code type', () => {
+  const phoneParsed = parseQrContent('+7 999 123-45-67', 'QR_CODE');
+  assert.equal(extractCleanPhoneNumber('+7 999 123-45-67', phoneParsed), '+7 999 123-45-67');
+  assert.deepEqual(extractContactDraft('+7 999 123-45-67', phoneParsed), { phone: '+7 999 123-45-67' });
+  assert.equal(buildTelUri('+7 (999) 123-45-67'), 'tel:+79991234567');
+  assert.equal(buildSmsUri('+7 (999) 123-45-67'), 'sms:+79991234567');
+  assert.deepEqual(
+    getPlannedQuickActionKinds({
+      rawContent: '+7 999 123-45-67',
+      parsed: phoneParsed,
+      hasSafeActionUrl: true,
+      showSecondaryBrowserButton: false,
+      isNativeAndroid: true,
+    }),
+    ['add_contact', 'call_phone', 'send_sms', 'copy_text']
+  );
+
+  const vcardStr = buildVCardQrString('Maria', '+79995554433', 'maria@example.com', 'Studio');
+  const vcardParsed = parseQrContent(vcardStr, 'QR_CODE');
+  assert.equal(extractCleanEmail(vcardStr, vcardParsed), 'maria@example.com');
+  const vcf = buildContactVcfContent(extractContactDraft(vcardStr, vcardParsed)!);
+  assert.match(vcf, /FN:Maria/);
+  assert.match(vcf, /TEL;TYPE=CELL:\+79995554433/);
+  assert.match(vcf, /EMAIL:maria@example.com/);
+
+  const wifiRaw = buildWifiQrString('CafeGuest', 'coffee2026', 'WPA', false);
+  const wifiParsed = parseQrContent(wifiRaw, 'QR_CODE');
+  assert.deepEqual(extractWifiQuickInfo(wifiRaw), {
+    ssid: 'CafeGuest',
+    password: 'coffee2026',
+    hasPassword: true,
+    auth: 'WPA',
+    hidden: false,
+  });
+  assert.deepEqual(
+    getPlannedQuickActionKinds({
+      rawContent: wifiRaw,
+      parsed: wifiParsed,
+      hasSafeActionUrl: false,
+      showSecondaryBrowserButton: false,
+      isNativeAndroid: true,
+    }),
+    ['copy_wifi_password', 'copy_wifi_ssid', 'open_wifi_settings']
+  );
+
+  const urlParsed = parseQrContent('https://github.com/RaspingMango/Ectode', 'QR_CODE');
+  assert.deepEqual(
+    getPlannedQuickActionKinds({
+      rawContent: 'https://github.com/RaspingMango/Ectode',
+      parsed: urlParsed,
+      hasSafeActionUrl: true,
+      showSecondaryBrowserButton: true,
+      isNativeAndroid: true,
+    }),
+    ['open_link_app', 'open_link_browser', 'copy_link']
+  );
+
+  const barcodeParsed = parseQrContent('4607004650932', 'EAN_13');
+  assert.equal(buildMailtoUri(' user@test.com '), 'mailto:user@test.com');
+  assert.equal(buildWebSearchUrl('4607004650932'), 'https://www.google.com/search?q=4607004650932');
+  assert.deepEqual(
+    getPlannedQuickActionKinds({
+      rawContent: '4607004650932',
+      parsed: barcodeParsed,
+      hasSafeActionUrl: false,
+      showSecondaryBrowserButton: false,
+      isNativeAndroid: false,
+    }),
+    ['search_web', 'copy_text']
+  );
+});
+
+
 
 
 
