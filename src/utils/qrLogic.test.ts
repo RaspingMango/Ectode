@@ -27,12 +27,23 @@ import {
 import { scanBarcodeWithZxing, mapZxingFormatToCodeFormat, ZXing } from './qrScanner';
 import { hexToRgb, rgbToHex, normalizeHexColor, getColorContrastRatio } from './color';
 import {
+  getIntlLocale,
+  getLocalizedColorPresetName,
   getLocalizedDetailKey,
   getLocalizedDetailValue,
+  getLocalizedFolderIconLabel,
   getLocalizedFolderName,
   formatCodeCount,
+  normalizeStoredLanguage,
   resolveDeviceLanguage,
+  LANGUAGE_OPTIONS,
   TRANSLATIONS,
+  en_us,
+  ru_ru,
+  fr_fr,
+  de_de,
+  es_es,
+  pt_pt,
 } from './i18n';
 import { sanitizeShareFileName, extractPngBase64 } from './share';
 import { sanitizeDownloadFileName, utf8ToBase64 } from './nativeFiles';
@@ -312,22 +323,30 @@ test('RGB/HEX color conversion and contrast ratio helpers work accurately', () =
   assert.ok(lowContrast < 1.3);
 });
 
-test('detail key and value localization translates Russian metadata cleanly for English UI', () => {
+test('detail key and value localization translates metadata cleanly across all 6 languages', () => {
   assert.equal(getLocalizedDetailKey('Формат', 'en'), 'Format');
-  assert.equal(getLocalizedDetailKey('Значение', 'en'), 'Value');
-  assert.equal(getLocalizedDetailKey('Сеть (SSID)', 'en'), 'Network (SSID)');
+  assert.equal(getLocalizedDetailKey('Формат', 'fr'), 'Format');
+  assert.equal(getLocalizedDetailKey('Значение', 'de'), 'Wert');
+  assert.equal(getLocalizedDetailKey('Сеть (SSID)', 'es'), 'Red (SSID)');
+  assert.equal(getLocalizedDetailKey('Пароль', 'pt'), 'Palavra-passe');
   assert.equal(getLocalizedDetailValue('(Без пароля)', 'en'), '(No password)');
+  assert.equal(getLocalizedDetailValue('(Без пароля)', 'fr'), '(Sans mot de passe)');
+  assert.equal(getLocalizedDetailValue('Да', 'de'), 'Ja');
   assert.equal(getLocalizedDetailKey('Формат', 'ru'), 'Формат');
 });
 
-test('getLocalizedFolderName translates stock names and preserves custom renames', () => {
+test('getLocalizedFolderName translates stock names across all 6 languages and preserves custom renames', () => {
   assert.equal(getLocalizedFolderName('tickets', 'Билеты', 'en'), 'Tickets');
   assert.equal(getLocalizedFolderName('tickets', 'Tickets', 'ru'), 'Билеты');
+  assert.equal(getLocalizedFolderName('tickets', 'Билеты', 'fr'), 'Billets');
+  assert.equal(getLocalizedFolderName('loyalty', 'Loyalty Cards', 'de'), 'Kundenkarten');
+  assert.equal(getLocalizedFolderName('links', 'Ссылки', 'es'), 'Enlaces');
+  assert.equal(getLocalizedFolderName('contacts', 'Contacts', 'pt'), 'Contactos');
   assert.equal(getLocalizedFolderName('tickets', 'Авиаперелёты', 'en'), 'Авиаперелёты');
-  assert.equal(getLocalizedFolderName('folder-123', 'Путешествия', 'en'), 'Путешествия');
+  assert.equal(getLocalizedFolderName('folder-123', 'Путешествия', 'fr'), 'Путешествия');
 });
 
-test('formatCodeCount handles Russian and English plural forms', () => {
+test('formatCodeCount handles Russian and Latin plural forms across all 6 languages', () => {
   assert.equal(formatCodeCount(0, 'ru'), '0 кодов');
   assert.equal(formatCodeCount(1, 'ru'), '1 код');
   assert.equal(formatCodeCount(2, 'ru'), '2 кода');
@@ -336,6 +355,42 @@ test('formatCodeCount handles Russian and English plural forms', () => {
   assert.equal(formatCodeCount(21, 'ru'), '21 код');
   assert.equal(formatCodeCount(1, 'en'), '1 code');
   assert.equal(formatCodeCount(3, 'en'), '3 codes');
+  assert.equal(formatCodeCount(1, 'fr'), '1 code');
+  assert.equal(formatCodeCount(4, 'fr'), '4 codes');
+  assert.equal(formatCodeCount(1, 'de'), '1 Code');
+  assert.equal(formatCodeCount(2, 'de'), '2 Codes');
+  assert.equal(formatCodeCount(1, 'es'), '1 código');
+  assert.equal(formatCodeCount(5, 'es'), '5 códigos');
+  assert.equal(formatCodeCount(1, 'pt'), '1 código');
+  assert.equal(formatCodeCount(7, 'pt'), '7 códigos');
+});
+
+test('separate locale files (en_us, ru_ru, fr_fr, de_de, es_es, pt_pt) stay in complete key parity with AI remarks', () => {
+  assert.equal(LANGUAGE_OPTIONS[0].id, 'en');
+  assert.equal(TRANSLATIONS.en, en_us);
+  assert.equal(TRANSLATIONS.ru, ru_ru);
+  assert.equal(TRANSLATIONS.fr, fr_fr);
+  assert.equal(TRANSLATIONS.de, de_de);
+  assert.equal(TRANSLATIONS.es, es_es);
+  assert.equal(TRANSLATIONS.pt, pt_pt);
+
+  const baseKeys = Object.keys(en_us).sort();
+  for (const option of LANGUAGE_OPTIONS) {
+    const dict = TRANSLATIONS[option.id];
+    assert.deepEqual(Object.keys(dict).sort(), baseKeys, `Key mismatch in ${option.fileLocale}`);
+    assert.ok(dict.aiTranslationNoticeTitle.trim().length > 0);
+    assert.ok(dict.aiTranslationNoticeDesc.trim().length > 0);
+    assert.match(dict.aiTranslationRepoCta, /GitHub/i);
+    assert.ok(getLocalizedColorPresetName('mint', 'Mint M3', option.id).length > 0);
+    assert.ok(getLocalizedFolderIconLabel('Ticket', 'Ticket', option.id).length > 0);
+    assert.ok(getIntlLocale(option.id).includes('-'));
+  }
+
+  assert.equal(normalizeStoredLanguage('en_us'), 'en');
+  assert.equal(normalizeStoredLanguage('ru_ru'), 'ru');
+  assert.equal(normalizeStoredLanguage('pt_BR'), 'pt');
+  assert.equal(normalizeStoredLanguage('fr'), 'fr');
+  assert.equal(normalizeStoredLanguage('unknown'), null);
 });
 
 test('resolveSafeCodeFormat preserves valid barcode formats and falls back to QR_CODE on mismatch', () => {
@@ -481,12 +536,15 @@ test('download format helpers support PNG, SVG, and JPEG normalization & extensi
   assert.equal(TRANSLATIONS.en.downloadJpeg, 'JPEG');
 });
 
-test('resolveDeviceLanguage defaults to ru for Russian locales and en for all other locales', () => {
+test('resolveDeviceLanguage detects ru/fr/de/es/pt locales and falls back to en', () => {
   assert.equal(resolveDeviceLanguage('ru'), 'ru');
   assert.equal(resolveDeviceLanguage('ru-RU'), 'ru');
   assert.equal(resolveDeviceLanguage('RU_KZ'), 'ru');
   assert.equal(resolveDeviceLanguage('en-US'), 'en');
-  assert.equal(resolveDeviceLanguage('de-DE'), 'en');
+  assert.equal(resolveDeviceLanguage('fr-FR'), 'fr');
+  assert.equal(resolveDeviceLanguage('de-DE'), 'de');
+  assert.equal(resolveDeviceLanguage('es-MX'), 'es');
+  assert.equal(resolveDeviceLanguage('pt-BR'), 'pt');
   assert.equal(resolveDeviceLanguage('uk-UA'), 'en');
   assert.equal(resolveDeviceLanguage('run'), 'en');
   assert.equal(resolveDeviceLanguage(''), 'en');

@@ -18,8 +18,10 @@ import {
   Camera,
   Monitor,
   Pin,
+  Sparkles,
 } from 'lucide-react';
-import { Language, TRANSLATIONS } from '../utils/i18n';
+import { LANGUAGE_OPTIONS, Language, TRANSLATIONS, getLanguageMeta } from '../utils/i18n';
+import { isNativeLinkPlatform, openExternalUrl } from '../utils/nativeLinks';
 import { ThemeMode } from '../utils/theme';
 import { DownloadImageFormat, DOWNLOAD_IMAGE_FORMATS } from '../utils/qrLogic';
 import { playTapSound, setAudioPreferences, triggerHaptic } from '../utils/audio';
@@ -119,6 +121,14 @@ export function SettingsView({
   };
 
   const isDark = theme === 'dark';
+  const activeLangMeta = getLanguageMeta(lang);
+
+  const openGitHubRepo = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!isNativeLinkPlatform()) return;
+    e.preventDefault();
+    playTapSound();
+    void openExternalUrl('https://github.com/RaspingMango/Ectode', { mode: 'system' });
+  };
 
   return (
     <div className="flex flex-col h-full w-full max-w-xl mx-auto px-4 py-2 space-y-4">
@@ -274,59 +284,132 @@ export function SettingsView({
       <div className={`rounded-[28px] p-5 shadow-xl transition-colors duration-200 border space-y-3.5 ${
         isDark ? 'bg-[#1e1f23] border-white/[0.04]' : 'bg-white border-black/[0.06] shadow-sm'
       }`}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Globe2 className={`w-4 h-4 ${isDark ? 'text-[#a8f09b]' : 'text-[#2e6c31]'}`} />
-            <h3 className="font-bold text-sm tracking-tight">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <Globe2 className={`w-4 h-4 shrink-0 ${isDark ? 'text-[#a8f09b]' : 'text-[#2e6c31]'}`} />
+            <h3 className="font-bold text-sm tracking-tight truncate">
               {t.languageSection}
             </h3>
           </div>
-          <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${
+          <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full shrink-0 ${
             isDark ? 'bg-[#282a2f] text-[#c4c7c5]' : 'bg-[#e9ece5] text-[#575a56]'
           }`}>
-            {lang === 'ru' ? 'RU • Русский' : 'EN • English'}
+            {activeLangMeta.shortCode} • {activeLangMeta.nativeName}
           </span>
         </div>
 
-        {/* Material 3 Segmented Language Switcher */}
-        <div className={`p-1 rounded-full flex gap-1 border ${
-          isDark ? 'bg-[#121316] border-white/[0.04]' : 'bg-[#f2f4ef] border-black/[0.04]'
-        }`}>
-          <button
-            type="button"
-            onClick={() => handleLangSelect('ru')}
-            className={`flex-1 py-3 px-4 rounded-full text-xs font-bold transition-all flex items-center justify-center gap-2 ${
-              lang === 'ru'
-                ? isDark
-                  ? 'bg-[#394738] text-[#a8f09b] shadow-sm'
-                  : 'bg-white text-[#2e6c31] shadow-sm'
-                : isDark
-                  ? 'text-[#8e918f] hover:text-[#e3e2e6]'
-                  : 'text-[#575a56] hover:text-[#191c19]'
-            }`}
-          >
-            <span>🇷🇺</span>
-            <span>{t.langRussian}</span>
-            {lang === 'ru' && <Check className="w-3.5 h-3.5 ml-1" />}
-          </button>
+        {/* Material 3 Multi-Language Grid */}
+        <div
+          role="radiogroup"
+          aria-label={t.languageSection}
+          className="grid grid-cols-2 sm:grid-cols-3 gap-2"
+        >
+          {LANGUAGE_OPTIONS.map((option) => {
+            const isSelected = lang === option.id;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                role="radio"
+                aria-checked={isSelected}
+                data-testid={`lang-option-${option.id}`}
+                onClick={() => handleLangSelect(option.id)}
+                className={`py-2.5 px-3 rounded-2xl text-xs font-bold transition-all flex items-center justify-between gap-2 border ${
+                  isSelected
+                    ? isDark
+                      ? 'bg-[#394738] border-[#a8f09b]/50 text-[#a8f09b] shadow-sm'
+                      : 'bg-[#e8f5e9] border-[#2e6c31]/40 text-[#1b5e20] shadow-sm'
+                    : isDark
+                      ? 'bg-[#282a2f] border-white/[0.04] text-[#c4c7c5] hover:bg-[#33353a] hover:text-[#e3e2e6]'
+                      : 'bg-[#f2f4ef] border-black/[0.05] text-[#404943] hover:bg-[#eaece6] hover:text-[#191c19]'
+                }`}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <span
+                    className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-md leading-none shrink-0 ${
+                      isSelected
+                        ? isDark
+                          ? 'bg-[#a8f09b]/20 text-[#a8f09b]'
+                          : 'bg-[#2e6c31]/15 text-[#1b5e20]'
+                        : isDark
+                          ? 'bg-[#1a1b1f] text-[#8e918f]'
+                          : 'bg-white text-[#575a56]'
+                    }`}
+                  >
+                    {option.shortCode}
+                  </span>
+                  <span className="truncate">{option.nativeName}</span>
+                </div>
 
-          <button
-            type="button"
-            onClick={() => handleLangSelect('en')}
-            className={`flex-1 py-3 px-4 rounded-full text-xs font-bold transition-all flex items-center justify-center gap-2 ${
-              lang === 'en'
-                ? isDark
-                  ? 'bg-[#394738] text-[#a8f09b] shadow-sm'
-                  : 'bg-white text-[#2e6c31] shadow-sm'
-                : isDark
-                  ? 'text-[#8e918f] hover:text-[#e3e2e6]'
-                  : 'text-[#575a56] hover:text-[#191c19]'
+                <div className="flex items-center gap-1 shrink-0">
+                  {option.isAiTranslated && (
+                    <span
+                      className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-md leading-none ${
+                        isSelected
+                          ? isDark
+                            ? 'bg-[#a8f09b]/15 text-[#c4fbb8]'
+                            : 'bg-[#2e6c31]/10 text-[#2e6c31]'
+                          : isDark
+                            ? 'bg-amber-500/15 text-amber-300'
+                            : 'bg-amber-100 text-amber-800'
+                      }`}
+                    >
+                      {t.aiTranslationBadge}
+                    </span>
+                  )}
+                  {isSelected && <Check className="w-3.5 h-3.5 shrink-0" />}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* AI Translation Remark + Repository Link */}
+        <div
+          data-testid="ai-translation-notice"
+          className={`p-3.5 rounded-2xl border space-y-2.5 ${
+            isDark
+              ? 'bg-[#282a2f]/75 border-amber-400/20 text-[#c4c7c5]'
+              : 'bg-[#fffbeb] border-amber-300/70 text-[#404943]'
+          }`}
+        >
+          <div className="flex items-start gap-2.5">
+            <Sparkles
+              className={`w-4 h-4 shrink-0 mt-0.5 ${
+                isDark ? 'text-amber-300' : 'text-amber-700'
+              }`}
+            />
+            <div className="space-y-1 min-w-0">
+              <div
+                className={`text-xs font-bold leading-tight ${
+                  isDark ? 'text-[#e3e2e6]' : 'text-[#191c19]'
+                }`}
+              >
+                {t.aiTranslationNoticeTitle}
+              </div>
+              <p className="text-[11px] leading-relaxed">
+                {t.aiTranslationNoticeDesc}
+              </p>
+            </div>
+          </div>
+
+          <a
+            href="https://github.com/RaspingMango/Ectode"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={openGitHubRepo}
+            className={`w-full py-2 px-3 rounded-xl text-[11px] font-bold flex items-center justify-between gap-2 transition-colors border ${
+              isDark
+                ? 'bg-[#1a1b1f] hover:bg-[#1e1f23] border-white/[0.06] text-[#a8f09b]'
+                : 'bg-white hover:bg-[#f2f4ef] border-amber-300/60 text-[#2e6c31]'
             }`}
           >
-            <span>🇬🇧</span>
-            <span>{t.langEnglish}</span>
-            {lang === 'en' && <Check className="w-3.5 h-3.5 ml-1" />}
-          </button>
+            <span className="flex items-center gap-2 min-w-0 truncate">
+              <Github className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">{t.aiTranslationRepoCta}</span>
+            </span>
+            <ExternalLink className="w-3.5 h-3.5 shrink-0 opacity-80" />
+          </a>
         </div>
       </div>
 
@@ -663,7 +746,7 @@ export function SettingsView({
             <Info className={`w-5 h-5 ${isDark ? 'text-[#a8f09b]' : 'text-[#2e6c31]'}`} />
             <div>
               <div className="text-xs font-bold">
-                Ectode • {t.appVersion} 1.4.4
+                Ectode • {t.appVersion} 1.4.5
               </div>
               <p className={`text-[10px] ${isDark ? 'text-[#8e918f]' : 'text-[#575a56]'}`}>
                 Offline First • Private
@@ -691,6 +774,7 @@ export function SettingsView({
           href="https://github.com/RaspingMango/Ectode"
           target="_blank"
           rel="noopener noreferrer"
+          onClick={openGitHubRepo}
           className={`w-full p-3 rounded-2xl flex items-center justify-between gap-2 transition-colors border ${
             isDark
               ? 'bg-[#282a2f] hover:bg-[#33353a] border-white/[0.04] text-[#e3e2e6]'

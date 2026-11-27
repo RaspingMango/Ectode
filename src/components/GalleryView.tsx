@@ -25,7 +25,7 @@ import {
 } from '../utils/qrLogic';
 import { generateQrDataUrl } from '../utils/qrRenderer';
 import { playTapSound, triggerHaptic } from '../utils/audio';
-import { Language, TRANSLATIONS, getLocalizedFolderName } from '../utils/i18n';
+import { Language, TRANSLATIONS, getIntlLocale, getLocalizedFolderName } from '../utils/i18n';
 import { ThemeMode } from '../utils/theme';
 import { getFolderIcon } from './FolderSelect';
 import { SortSelect } from './SortSelect';
@@ -401,7 +401,7 @@ export function GalleryView({
           {displayedItems.map((item) => {
             const folder = folders.find((f) => f.id === item.folderId) || folders[0];
             const localizedFolderName = getLocalizedFolderName(folder.id, folder.name, lang);
-            const dateStr = new Date(item.createdAt).toLocaleDateString(lang === 'ru' ? 'ru' : 'en-US', {
+            const dateStr = new Date(item.createdAt).toLocaleDateString(getIntlLocale(lang), {
               day: 'numeric',
               month: 'short',
             });

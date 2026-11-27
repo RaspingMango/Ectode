@@ -8,7 +8,7 @@ import {
   rgbToHex,
 } from '../utils/color';
 import { playTapSound } from '../utils/audio';
-import { Language, TRANSLATIONS } from '../utils/i18n';
+import { Language, TRANSLATIONS, getLocalizedColorPresetName } from '../utils/i18n';
 import { ThemeMode } from '../utils/theme';
 
 interface CodeColorPickerProps {
@@ -91,9 +91,7 @@ export function CodeColorPicker({
           </div>
           <span className="text-[11px] text-[#8e918f]">
             {matchingPreset
-              ? lang === 'ru'
-                ? matchingPreset.name
-                : matchingPreset.nameEn
+              ? getLocalizedColorPresetName(matchingPreset.id, matchingPreset.nameEn, lang)
               : t.customRgbBadge}
           </span>
         </div>
@@ -109,7 +107,7 @@ export function CodeColorPicker({
                   playTapSound();
                   onChange({ fgColor: p.fg, bgColor: p.bg });
                 }}
-                title={lang === 'ru' ? p.name : p.nameEn}
+                title={getLocalizedColorPresetName(p.id, p.nameEn, lang)}
                 className={
                   compactPresets
                     ? `flex-1 py-1.5 rounded-full border flex items-center justify-center transition-all ${
@@ -136,7 +134,7 @@ export function CodeColorPicker({
                   className="w-3.5 h-3.5 rounded-full border border-black/20 shrink-0"
                   style={{ background: `linear-gradient(135deg, ${p.fg} 50%, ${p.bg} 50%)` }}
                 />
-                {!compactPresets && <span>{lang === 'ru' ? p.name : p.nameEn}</span>}
+                {!compactPresets && <span>{getLocalizedColorPresetName(p.id, p.nameEn, lang)}</span>}
               </button>
             );
           })}

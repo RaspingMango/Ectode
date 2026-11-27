@@ -1,11 +1,25 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
+import fs from 'node:fs';
 import path from 'path';
-import {defineConfig} from 'vite';
+import {defineConfig, type Plugin} from 'vite';
+
+function stripAiStudioPublicAssets(): Plugin {
+  return {
+    name: 'strip-aistudio-public-assets',
+    apply: 'build',
+    closeBundle() {
+      const leakedDir = path.resolve(__dirname, 'dist', 'assets', 'aistudio');
+      if (fs.existsSync(leakedDir)) {
+        fs.rmSync(leakedDir, { recursive: true, force: true });
+      }
+    },
+  };
+}
 
 export default defineConfig(() => {
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [react(), tailwindcss(), stripAiStudioPublicAssets()],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

@@ -3,7 +3,7 @@ import { X, FolderPlus, Check } from 'lucide-react';
 import { Folder } from '../utils/qrLogic';
 import { hexToRgb, normalizeHexColor, rgbToHex } from '../utils/color';
 import { playTapSound, triggerHaptic } from '../utils/audio';
-import { Language, TRANSLATIONS, getLocalizedFolderName } from '../utils/i18n';
+import { Language, TRANSLATIONS, getLocalizedFolderIconLabel, getLocalizedFolderName } from '../utils/i18n';
 import { ThemeMode } from '../utils/theme';
 import { FOLDER_ICON_OPTIONS, getFolderIconByName } from './FolderSelect';
 
@@ -135,7 +135,7 @@ export function FolderModal({
     onClose();
   };
 
-  const previewTitle = name.trim() || (lang === 'ru' ? 'Новая папка' : 'New Folder');
+  const previewTitle = name.trim() || t.defaultNewFolderName;
 
   return (
     <div
@@ -231,7 +231,7 @@ export function FolderModal({
             <div className="grid grid-cols-6 gap-2">
               {FOLDER_ICON_OPTIONS.map((opt) => {
                 const isSelected = icon.toLowerCase() === opt.id.toLowerCase();
-                const iconLabel = lang === 'ru' ? opt.labelRu : opt.labelEn;
+                const iconLabel = getLocalizedFolderIconLabel(opt.id, opt.labelEn, lang);
                 return (
                   <button
                     key={opt.id}

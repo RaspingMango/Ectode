@@ -30,7 +30,7 @@
 
 ### Personalization
 - **Dark (AMOLED) & Light themes** with adaptive system bars.
-- **Bilingual UI**: Russian and English (`RU` / `EN`).
+- **Multi-language UI**: English, Russian, French, German, Spanish, and Portuguese (`EN`, `RU`, plus AI-translated `FR`, `DE`, `ES`, `PT`).
 - **Sound & haptic feedback**: independent sound and vibration toggles that persist across restarts.
 
 ---

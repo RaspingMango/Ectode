@@ -1,5 +1,5 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
-import type { Language } from './i18n';
+import { TRANSLATIONS, type Language } from './i18n';
 import type { ParsedQrData } from './qrLogic';
 import { ContactDraft, buildContactVcfContent } from './scannedActions';
 
@@ -149,9 +149,7 @@ export function resolveLinkActionPresentation(params: {
     const singleApp = inspection.apps.length === 1 ? inspection.apps[0] : null;
     const appLabel = singleApp?.label?.trim();
     const primaryLabel = appLabel
-      ? lang === 'ru'
-        ? `Открыть в ${appLabel}`
-        : `Open in ${appLabel}`
+      ? TRANSLATIONS[lang].openInAppNamedTemplate.replace('{app}', appLabel)
       : openInAppLabel;
 
     return {

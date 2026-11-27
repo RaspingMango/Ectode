@@ -1,652 +1,83 @@
-export type Language = 'ru' | 'en';
+import { en_us } from './locales/en_us';
+import { ru_ru } from './locales/ru_ru';
+import { fr_fr } from './locales/fr_fr';
+import { de_de } from './locales/de_de';
+import { es_es } from './locales/es_es';
+import { pt_pt } from './locales/pt_pt';
+import type {
+  ColorPresetId,
+  FolderIconId,
+  Language,
+  LocaleOptionMeta,
+  TranslationSchema,
+} from './locales/types';
 
-export const TRANSLATIONS = {
-  ru: {
-    // App Header
-    appSlogan: 'Сканер и кошелёк кодов',
-    soundOn: 'Звук включен',
-    soundOff: 'Звук выключен',
-    aboutApp: 'О приложении Ectode',
+export type {
+  ColorPresetId,
+  FolderIconId,
+  Language,
+  LocaleOptionMeta,
+  TranslationSchema,
+};
 
-    // Bottom Navigation
-    tabScanner: 'Сканер',
-    tabGallery: 'Галерея',
-    tabCreate: 'Создать',
-    tabSettings: 'Настройки',
+export { en_us, ru_ru, fr_fr, de_de, es_es, pt_pt };
 
-    // Settings Screen
-    settingsTitle: 'Настройки',
-    settingsSubtitle: 'Тема, язык и параметры Ectode',
-    appearanceSection: 'Внешний вид',
-    themeLabel: 'Тема оформления',
-    themeDark: 'Тёмная',
-    themeLight: 'Светлая',
-    themeSystem: 'Системная',
-    themeDarkDesc: 'Тёмные контрастные поверхности (AMOLED)',
-    themeLightDesc: 'Светлые мягкие поверхности и акценты',
-    languageSection: 'Язык интерфейса',
-    langRussian: 'Русский',
-    langEnglish: 'English',
-    feedbackSection: 'Звук и тактильный отклик',
-    soundTitle: 'Звуковые сигналы',
-    soundDesc: 'Звуковой сигнал при сканировании и кликах',
-    hapticTitle: 'Виброотклик',
-    hapticDesc: 'Тактильная вибрация при сканировании',
-    galleryBadgeTitle: 'Счётчик кодов на вкладке',
-    galleryBadgeDesc: 'Показывать количество кодов в нижнем меню',
-    downloadFormatLabel: 'Формат скачивания по умолчанию',
-    downloadFormatDesc: 'Нажатие скачивает в выбранном формате, а зажатие открывает меню PNG / SVG / JPEG',
-    downloadFormatPngDesc: 'Чёткое изображение без сжатия',
-    downloadFormatSvgDesc: 'Вектор для печати и редакторов',
-    downloadFormatJpegDesc: 'Компактный растровый файл .jpg',
-    dataSection: 'Управление данными',
-    backupDataTitle: 'Скачать резервную копию',
-    backupDataDesc: 'Сохранить все коды и папки в JSON-файл',
-    restoreDataTitle: 'Восстановить из файла',
-    restoreDataDesc: 'Загрузить резервную копию кодов',
-    demoModeActivated: 'Демо-режим включён',
-    demoModeDeactivated: 'Демо-режим выключен',
-    savedToDownloads: 'Сохранено в Загрузки:',
-    downloadFailed: 'Не удалось сохранить файл',
-    clipboardPermissionDenied: 'Доступ к буферу обмена отклонён. Выберите скриншот из галереи.',
-    quickTilesSection: 'Быстрые действия в шторке',
-    quickTilesDesc: 'Закрепите кнопки Ectode рядом с Wi-Fi и Bluetooth для мгновенного запуска камеры или сканирования экрана.',
-    pinCameraTileTitle: 'Ectode: Камера',
-    pinCameraTileDesc: 'Открывает камеру для быстрого сканирования',
-    pinScreenTileTitle: 'Ectode: Экран',
-    pinScreenTileDesc: 'Ищет QR и штрихкод прямо с экрана',
-    pinTileBtn: 'Закрепить',
-    quickTilesManualHint: 'Также кнопки можно добавить вручную: опустите шторку → нажмите редактирование (✏️) → перетащите плитки Ectode.',
-    tilePinAdded: 'Кнопка закреплена в панели быстрых действий',
-    tilePinAlreadyAdded: 'Эта кнопка уже закреплена в шторке',
-    tilePinDismissed: 'Добавление кнопки отменено',
-    tilePinManualTip: 'Откройте шторку, нажмите редактирование (✏️) и перетащите плитку Ectode наверх.',
-    tilePinError: 'Не удалось открыть окно закрепления. Добавьте плитку через редактирование шторки.',
-    aboutSection: 'О приложении',
-    appVersion: 'Версия',
+export const TRANSLATIONS: Record<Language, TranslationSchema> = {
+  en: en_us,
+  ru: ru_ru,
+  fr: fr_fr,
+  de: de_de,
+  es: es_es,
+  pt: pt_pt,
+};
 
-    // Scanner
-    modeCamera: 'Камера',
-    modeScreen: 'Захват экрана',
-    modeScreenshot: 'Скриншот',
-    scanningCamera: 'Поиск QR и штрихкодов...',
-    scanningScreen: 'Захват экрана: поиск кода...',
-    screenModeTitle: 'Сканирование с экрана',
-    screenModeDesc: 'Считывайте QR-коды и штрихкоды прямо из активного окна, мессенджера, билета или сайта на вашем экране без второго телефона.',
-    startScreenCapture: 'Выбрать экран / окно для сканирования',
-    startScreenCaptureNative: 'Запустить захват экрана',
-    stopScreenCapture: 'Остановить захват экрана',
-    screenModeTip: 'Выберите окно с QR или штрихкодом для распознавания.',
-    screenModeTipNative: 'Нажмите кнопку ниже, выберите «Весь экран» или приложение в системном окне и переключитесь на нужный код.',
-    scanningScreenNativeTitle: 'Сканирование экрана активно',
-    scanningScreenNativeDesc: 'Переключитесь в мессенджер, браузер или билет — как только QR или штрихкод появится на экране, Ectode распознает его автоматически.',
-    screenNotifTitle: 'Ectode • Сканирование экрана',
-    screenNotifText: 'Откройте приложение с QR или штрихкодом',
-    screenNotifStop: 'Остановить',
-    screenDetectedTitle: 'Код распознан в Ectode',
-    screenDetectedText: 'Нажмите, чтобы открыть и сохранить код',
-    screenshotTitle: 'Скриншот или фото',
-    screenshotDesc: 'Выберите изображение с QR-кодом или штрихкодом для распознавания.',
-    chooseFromGallery: 'Выбрать из галереи',
-    pasteScreenshot: 'Вставить скриншот',
-    analyzingImage: 'Анализ изображения и декодирование...',
-    cameraDisabled: 'Камера отключена или ожидает разрешения.',
-    enableCamera: 'Включить камеру',
-    cameraPermissionDenied: 'Разрешение на использование камеры отклонено. Разрешите доступ или воспользуйтесь режимом захвата экрана.',
-    torchTurnOn: 'Включить фонарик',
-    torchTurnOff: 'Выключить фонарик',
-    flipCameraLabel: 'Переключить камеру',
-    cameraNotFound: 'Камера на устройстве не найдена. Попробуйте режим захвата экрана или загрузку скриншота.',
-    quickScanTest: 'Быстрый тест сканирования:',
-    testWithoutCamera: 'Для проверки без камеры',
-    sampleTicket: '🎫 Авиабилет',
-    sampleLoyalty: '💳 Карта скидок',
-    sampleWifi: '📶 Wi-Fi сеть',
-    sampleBarcode: '📊 EAN-13 Штрихкод',
+export const LANGUAGE_OPTIONS: readonly LocaleOptionMeta[] = [
+  { id: 'en', shortCode: 'EN', fileLocale: 'en_us', intlLocale: 'en-US', nativeName: 'English', isAiTranslated: false },
+  { id: 'ru', shortCode: 'RU', fileLocale: 'ru_ru', intlLocale: 'ru-RU', nativeName: 'Русский', isAiTranslated: false },
+  { id: 'fr', shortCode: 'FR', fileLocale: 'fr_fr', intlLocale: 'fr-FR', nativeName: 'Français', isAiTranslated: true },
+  { id: 'de', shortCode: 'DE', fileLocale: 'de_de', intlLocale: 'de-DE', nativeName: 'Deutsch', isAiTranslated: true },
+  { id: 'es', shortCode: 'ES', fileLocale: 'es_es', intlLocale: 'es-ES', nativeName: 'Español', isAiTranslated: true },
+  { id: 'pt', shortCode: 'PT', fileLocale: 'pt_pt', intlLocale: 'pt-PT', nativeName: 'Português', isAiTranslated: true },
+] as const;
 
-    // Clean QR Modal
-    cleanModalTitle: 'Просмотр QR-кода',
-    cleanBarcodeModalTitle: 'Просмотр штрихкода',
-    cleanModalSubtitle: 'Перерисован для сканирования и сохранения',
-    fullScreenTurnstile: 'Во весь экран',
-    vectorOriginalBadge: 'Векторная графика',
-    eccCorrection: 'Коррекция',
-    formatBadgeLabel: 'Формат',
-    downloadBtn: 'Скачать',
-    downloadedBtn: 'Сохранено',
-    downloadMenuTitle: 'Формат файла',
-    downloadPng: 'PNG',
-    downloadSvg: 'SVG',
-    downloadJpeg: 'JPEG',
-    copyImage: 'Картинка',
-    copiedImage: 'Готово',
-    shareQr: 'Поделиться',
-    customizeStyle: 'Настроить палитру и уровень защиты QR',
-    customizeBarcodeStyle: 'Настроить палитру и формат штрихкода',
-    paletteLabel: 'Цветовая гамма Material You:',
-    eccLabel: 'Уровень избыточности (ECC):',
-    barcodeFormatLabel: 'Формат штрихкода:',
-    copyText: 'Копировать текст',
-    copiedText: 'Скопировано!',
-    openInBrowser: 'Открыть в браузере',
-    openInApp: 'Открыть в приложении',
-    openInBrowserShort: 'Браузер',
-    openInBrowserTooltip: 'Открыть в браузере',
-    unableToOpenLink: 'На устройстве не найдено приложение для открытия ссылки',
-    executeAction: 'Выполнить действие',
-    editCodeBtn: 'Редактировать',
-    quickActionsHeader: 'Быстрые действия',
-    addToContacts: 'Добавить в контакты',
-    contactOpenedToast: 'Открыто приложение «Контакты»',
-    contactVcfSavedToast: 'Карточка контакта (.vcf) сохранена',
-    contactOpenFailedToast: 'Не удалось создать контакт',
-    callNumber: 'Позвонить',
-    sendSms: 'Написать SMS',
-    copyPhone: 'Копировать номер',
-    sendEmail: 'Написать письмо',
-    copyEmail: 'Копировать Email',
-    copyWifiPassword: 'Скопировать пароль',
-    copyWifiSsid: 'Скопировать сеть',
-    wifiSettingsBtn: 'Настройки Wi-Fi',
-    wifiPassCopiedToast: 'Пароль Wi-Fi скопирован',
-    wifiSsidCopiedToast: 'Имя сети (SSID) скопировано',
-    searchOnline: 'Найти в интернете',
-    copyLink: 'Копировать ссылку',
-    saveToGalleryHeader: 'Сохранение в Галерею',
-    inFavorites: 'В избранном',
-    addToFavorites: 'В избранное',
-    qrTitleLabel: 'Название кода:',
-    qrTitlePlaceholder: 'Например: Билет на самолет или Карта скидок',
-    folderLabel: 'Папка для сортировки:',
-    noteLabel: 'Заметка (опционально):',
-    notePlaceholder: 'Любые подробности, пин-код или дата...',
-    cancelBtn: 'Отмена',
-    saveBtn: 'Сохранить в Галерею',
-    updateBtn: 'Обновить в Галерее',
-    savedSuccessText: 'Сохранено в',
+export function getLanguageMeta(lang: Language): LocaleOptionMeta {
+  return LANGUAGE_OPTIONS.find((opt) => opt.id === lang) || LANGUAGE_OPTIONS[0];
+}
 
-    // Turnstile Modal
-    turnstileTitle: 'Максимальная яркость',
-    turnstileTip: 'Поднесите экран к сканеру турникета или кассы',
-    turnstileClose: 'Готово',
+export function getIntlLocale(lang: Language): string {
+  return getLanguageMeta(lang).intlLocale;
+}
 
-    // Gallery
-    searchPlaceholder: 'Поиск кодов',
-    allCodesChip: 'Все коды',
-    favoritesChip: 'Избранное',
-    newFolderChip: 'Новая папка',
-    manageFoldersBtn: 'Папки',
-    emptyTitle: 'В этой папке пока пусто',
-    emptySearchTitle: 'Ничего не найдено',
-    emptyDesc: 'Отсканируйте QR или штрихкод с экрана или камеры, либо создайте новый код.',
-    emptySearchDesc: 'Попробуйте изменить поисковый запрос или выбрать другую папку.',
-    scanFirstBtn: 'Отсканировать код',
-    createFirstBtn: 'Создать код',
-    turnstileBtn: 'Турникет',
-    moveToFolderTooltip: 'Переместить в другую папку',
-    moveToTitle: 'Переместить в:',
-    deleteTooltip: 'Удалить код',
-    deleteConfirmTitle: 'Удалить код?',
-    deleteConfirm: 'Удалить этот код из галереи Ectode?',
-    deleteBtn: 'Удалить',
-    backupBtn: 'Резервная копия',
-    restoreBtn: 'Восстановить',
-    backupRestored: 'Успешно восстановлено кодов:',
-    backupError: 'Не удалось прочитать файл резервной копии.',
-    sortNewest: 'Новые',
-    sortOldest: 'Старые',
-    sortFavorites: 'Избранные',
-    sortAlphabetical: 'А-Я',
-    sourceCamera: 'Камера',
-    sourceScreen: 'Захват экрана',
-    sourceFile: 'Скриншот',
-    sourceGenerated: 'Сгенерирован',
-
-    // Generator
-    generatorTitle: 'Параметры содержимого',
-    editModeBannerTitle: 'Редактирование кода',
-    editModeBannerDesc: 'Измените текст, тип кода, палитру или уровень защиты',
-    cancelEditBtn: 'Отмена',
-    saveChangesBtn: 'Сохранить изменения',
-    changesSavedToast: 'Изменения сохранены!',
-    tabEdit: 'Редактирование',
-    liveVectorPreview: 'Предпросмотр',
-    pristineVectorQuality: 'Векторная графика',
-    saveToGalleryGen: 'Сохранить в галерею',
-    savedToGalleryGen: 'Сохранено в Ectode!',
-    templateText: 'Текст',
-    templateUrl: 'Ссылка',
-    templateWifi: 'Wi-Fi',
-    templateTicket: 'Билет',
-    templateLoyalty: 'Карта',
-    templateBarcode: 'Штрихкод',
-    templateContact: 'Контакт',
-    templatePhone: 'Телефон',
-    templateEmail: 'Email',
-    enterEmailLabel: 'Адрес электронной почты (Email):',
-    barcodeFormatSelectLabel: 'Стандарт штрихкода:',
-    barcodeValueLabel: 'Значение штрихкода:',
-    barcodeSampleFill: 'Пример',
-    barcodeErrEmpty: 'Введите данные для генерации штрихкода',
-    barcodeErrEan13Digits: 'Для EAN-13 введите 12 или 13 цифр',
-    barcodeErrEan13Check: 'Неверная контрольная цифра EAN-13 (последняя цифра)',
-    barcodeErrEan8Digits: 'Для EAN-8 введите 7 или 8 цифр',
-    barcodeErrEan8Check: 'Неверная контрольная цифра EAN-8',
-    barcodeErrUpcaDigits: 'Для UPC-A введите 11 или 12 цифр',
-    barcodeErrUpcaCheck: 'Неверная контрольная цифра UPC-A',
-    barcodeErrUpceDigits: 'Для UPC-E введите 6–8 цифр (начиная с 0 или 1)',
-    barcodeErrCode39: 'Code 39 поддерживает 0–9, A–Z, пробел и - . $ / + %',
-    barcodeErrItf: 'ITF-14 требует чётное количество цифр',
-    barcodeErrCodabar: 'Codabar поддерживает цифры 0–9 и - $ : / . +',
-    barcodeErrCode128: 'Code 128 поддерживает латиницу, цифры и ASCII-символы',
-    codeTypeSwitchLabel: 'Тип кода:',
-    codeKindQr: 'QR-код',
-    codeKindBarcode: 'Штрихкод',
-    enterTextLabel: 'Введите произвольный текст:',
-    enterTextPlaceholder: 'Любой текст, заметка, промокод или инструкция...',
-    enterUrlLabel: 'Веб-ссылка (URL):',
-    wifiSsidLabel: 'Имя сети (SSID):',
-    wifiPassLabel: 'Пароль:',
-    wifiAuthLabel: 'Шифрование:',
-    wifiAuthWpaDesc: 'Рекомендуемый стандарт',
-    wifiAuthWepDesc: 'Устаревший протокол',
-    wifiAuthOpenLabel: 'Без пароля (Open)',
-    wifiAuthOpenDesc: 'Открытая сеть без пароля',
-    wifiHiddenLabel: 'Скрытая сеть',
-    ticketEventLabel: 'Событие / Рейс / Фильм:',
-    ticketEventPlaceholder: 'Например: Сапсан Москва-СПб или Кино: Дюна',
-    ticketSeatLabel: 'Место / Сектор:',
-    ticketCodeLabel: 'Код билета:',
-    loyaltyStoreLabel: 'Магазин / Бренд:',
-    loyaltyStorePlaceholder: 'ВкусВилл, Золотое Яблоко, Перекресток...',
-    loyaltyNumberLabel: 'Номер карты / Штрихкод:',
-    vcardNameLabel: 'Полное имя:',
-    vcardPhoneLabel: 'Телефон:',
-    vcardEmailLabel: 'Email:',
-    vcardOrgLabel: 'Компания / Должность:',
-    phoneLabel: 'Номер телефона:',
-    nameForGallery: 'Название для галереи:',
-    styleLabel: 'Палитра:',
-    rgbPaletteTitle: 'Своя RGB-палитра:',
-    codeColorLabel: 'Цвет кода',
-    bgColorLabel: 'Цвет фона',
-    swapColors: 'Поменять местами',
-    customRgbBadge: 'Свой RGB',
-    lowContrastWarning: 'Низкий контраст — сканер может не считать код',
-    redLabel: 'R',
-    greenLabel: 'G',
-    blueLabel: 'B',
-
-    // Folder Modal & Management
-    newFolderTitle: 'Новая папка в Ectode',
-    editFolderTitle: 'Редактировать папку',
-    manageFoldersTitle: 'Управление папками',
-    manageFoldersDesc: 'Зажмите папку для изменения порядка или настройте иконки',
-    folderNameLabel: 'Название папки:',
-    folderNamePlaceholder: 'Например: Поездка, Магазины, Счета...',
-    folderNameError: 'Введите название папки',
-    folderIconLabel: 'Иконка папки:',
-    folderColorLabel: 'Цвет иконки:',
-    folderPreviewLabel: 'Предпросмотр:',
-    customColorLabel: 'Свой цвет',
-    deleteFolderTitle: 'Удалить папку?',
-    deleteFolderConfirm: 'Папка будет удалена, а сохранённые в ней коды перенесутся в другую папку.',
-    cannotDeleteLastFolder: 'Нельзя удалить единственную папку',
-    folderItemsCount: 'кодов',
-    editFolderTooltip: 'Редактировать папку',
-    deleteFolderTooltip: 'Удалить папку',
-    reorderFolderHint: 'Зажмите для перемещения',
-    saveFolderBtn: 'Сохранить',
-
-    // About Modal
-    aboutTitle: 'Ectode',
-    feature1Title: 'Захват экрана и камеры',
-    feature1Desc: 'Считывайте QR-коды и штрихкоды прямо с экрана в любых приложениях без второго устройства.',
-    feature2Title: 'Перерисовка кода',
-    feature2Desc: 'Считанный QR или штрихкод отрисовывается заново для удобного сканирования на турникетах и кассах.',
-    feature3Title: 'Галерея и папки',
-    feature3Desc: 'Раскладывайте билеты, карты лояльности, Wi-Fi и штрихкоды по категориям.',
-    githubRepoTitle: 'Исходный код на GitHub',
-    aboutUnderstood: 'Понятно',
-
-    // Default Folder Translations
-    folderTickets: 'Билеты',
-    folderLoyalty: 'Карты лояльности',
-    folderWifi: 'Wi-Fi сети',
-    folderLinks: 'Ссылки',
-    folderContacts: 'Контакты',
-    folderDocs: 'Документы & Другое',
-  },
-  en: {
-    // App Header
-    appSlogan: 'Code Scanner & Wallet',
-    soundOn: 'Sound enabled',
-    soundOff: 'Sound muted',
-    aboutApp: 'About Ectode',
-
-    // Bottom Navigation
-    tabScanner: 'Scanner',
-    tabGallery: 'Gallery',
-    tabCreate: 'Create',
-    tabSettings: 'Settings',
-
-    // Settings Screen
-    settingsTitle: 'Settings',
-    settingsSubtitle: 'Theme, language & Ectode options',
-    appearanceSection: 'Appearance',
-    themeLabel: 'Color Theme',
-    themeDark: 'Dark',
-    themeLight: 'Light',
-    themeSystem: 'System',
-    themeDarkDesc: 'Dark high-contrast surfaces (AMOLED)',
-    themeLightDesc: 'Soft light surfaces and accents',
-    languageSection: 'Language',
-    langRussian: 'Русский',
-    langEnglish: 'English',
-    feedbackSection: 'Sound & Haptic Feedback',
-    soundTitle: 'Sound Effects',
-    soundDesc: 'Synthesized chime on scan and taps',
-    hapticTitle: 'Haptic Feedback',
-    hapticDesc: 'Tactile vibration when scanning',
-    galleryBadgeTitle: 'Gallery Tab Counter',
-    galleryBadgeDesc: 'Show saved code count in bottom navigation',
-    downloadFormatLabel: 'Default Download Format',
-    downloadFormatDesc: 'Tap downloads in this format; press & hold opens PNG / SVG / JPEG menu',
-    downloadFormatPngDesc: 'Lossless high-resolution image',
-    downloadFormatSvgDesc: 'Vector file for print & design tools',
-    downloadFormatJpegDesc: 'Compact .jpg image file',
-    dataSection: 'Data Management',
-    backupDataTitle: 'Download Backup',
-    backupDataDesc: 'Export all codes and folders to JSON file',
-    restoreDataTitle: 'Restore from Backup',
-    restoreDataDesc: 'Import JSON backup file',
-    demoModeActivated: 'Demo mode enabled',
-    demoModeDeactivated: 'Demo mode disabled',
-    savedToDownloads: 'Saved to Downloads:',
-    downloadFailed: 'Failed to save file',
-    clipboardPermissionDenied: 'Clipboard read permission denied. Please pick a screenshot from files.',
-    quickTilesSection: 'Quick Settings Tiles',
-    quickTilesDesc: 'Pin Ectode shortcuts in your Android Quick Settings shade alongside Wi-Fi and Bluetooth.',
-    pinCameraTileTitle: 'Ectode: Camera',
-    pinCameraTileDesc: 'Opens camera scanner immediately',
-    pinScreenTileTitle: 'Ectode: Screen',
-    pinScreenTileDesc: 'Scans QR codes & barcodes from your screen',
-    pinTileBtn: 'Pin',
-    quickTilesManualHint: 'You can also add them manually: pull down Quick Settings → tap Edit (✏️) → drag the Ectode tiles up.',
-    tilePinAdded: 'Tile pinned to Quick Settings',
-    tilePinAlreadyAdded: 'This tile is already in Quick Settings',
-    tilePinDismissed: 'Tile pin request cancelled',
-    tilePinManualTip: 'Open Quick Settings, tap Edit (✏️), and drag the Ectode tile into your active panel.',
-    tilePinError: 'Unable to open pin dialog. Add the tile via Quick Settings Edit.',
-    aboutSection: 'About Ectode',
-    appVersion: 'Version',
-
-    // Scanner
-    modeCamera: 'Camera',
-    modeScreen: 'Screen Capture',
-    modeScreenshot: 'Screenshot',
-    scanningCamera: 'Scanning for QR & barcodes...',
-    scanningScreen: 'Screen capture: scanning for codes...',
-    screenModeTitle: 'Scan from Screen',
-    screenModeDesc: 'Read QR codes and barcodes directly from any active window, messenger, PDF ticket, or website on your screen without a second device.',
-    startScreenCapture: 'Select Screen / Window to Scan',
-    startScreenCaptureNative: 'Start Screen Capture',
-    stopScreenCapture: 'Stop Screen Capture',
-    screenModeTip: 'Select a window containing a QR code or barcode to scan.',
-    screenModeTipNative: 'Tap the button below, select "Entire screen" or an app in the system prompt, then switch to the code.',
-    scanningScreenNativeTitle: 'Screen Scanning Active',
-    scanningScreenNativeDesc: 'Switch to your messenger, browser, or ticket — as soon as a QR code or barcode appears on screen, Ectode will detect it automatically.',
-    screenNotifTitle: 'Ectode • Screen Scanning',
-    screenNotifText: 'Open the app showing the QR code or barcode',
-    screenNotifStop: 'Stop',
-    screenDetectedTitle: 'Code Detected by Ectode',
-    screenDetectedText: 'Tap to open and save the code',
-    screenshotTitle: 'Screenshot or Photo',
-    screenshotDesc: 'Select an image with a QR code or barcode to scan.',
-    chooseFromGallery: 'Choose from Files',
-    pasteScreenshot: 'Paste Screenshot',
-    analyzingImage: 'Analyzing image and decoding...',
-    cameraDisabled: 'Camera is disabled or awaiting permission.',
-    enableCamera: 'Enable Camera',
-    cameraPermissionDenied: 'Camera permission was denied. Allow access or use Screen Capture.',
-    torchTurnOn: 'Turn on flashlight',
-    torchTurnOff: 'Turn off flashlight',
-    flipCameraLabel: 'Switch camera',
-    cameraNotFound: 'Camera was not detected on this device. Try Screen Capture or upload a screenshot.',
-    quickScanTest: 'Quick Scan Demo Test:',
-    testWithoutCamera: 'Test without physical camera',
-    sampleTicket: '🎫 Flight Ticket',
-    sampleLoyalty: '💳 Discount Card',
-    sampleWifi: '📶 Wi-Fi Network',
-    sampleBarcode: '📊 EAN-13 Barcode',
-
-    // Clean QR Modal
-    cleanModalTitle: 'QR Code View',
-    cleanBarcodeModalTitle: 'Barcode View',
-    cleanModalSubtitle: 'Redrawn for scanning and saving',
-    fullScreenTurnstile: 'Full Screen',
-    vectorOriginalBadge: 'Vector Graphics',
-    eccCorrection: 'ECC',
-    formatBadgeLabel: 'Format',
-    downloadBtn: 'Download',
-    downloadedBtn: 'Saved',
-    downloadMenuTitle: 'Choose Format',
-    downloadPng: 'PNG',
-    downloadSvg: 'SVG',
-    downloadJpeg: 'JPEG',
-    copyImage: 'Image',
-    copiedImage: 'Copied',
-    shareQr: 'Share',
-    customizeStyle: 'Customize Material You Palette & ECC',
-    customizeBarcodeStyle: 'Customize Palette & Barcode Format',
-    paletteLabel: 'Material You Color Scheme:',
-    eccLabel: 'Error Correction Level (ECC):',
-    barcodeFormatLabel: 'Barcode Standard:',
-    copyText: 'Copy Text',
-    copiedText: 'Copied!',
-    openInBrowser: 'Open in Browser',
-    openInApp: 'Open in App',
-    openInBrowserShort: 'Browser',
-    openInBrowserTooltip: 'Open in browser',
-    unableToOpenLink: 'No installed app found to open this link',
-    executeAction: 'Perform Action',
-    editCodeBtn: 'Edit',
-    quickActionsHeader: 'Quick Actions',
-    addToContacts: 'Add to Contacts',
-    contactOpenedToast: 'Opened Contacts app',
-    contactVcfSavedToast: 'Contact card (.vcf) downloaded',
-    contactOpenFailedToast: 'Could not add contact',
-    callNumber: 'Call',
-    sendSms: 'Send SMS',
-    copyPhone: 'Copy Number',
-    sendEmail: 'Send Email',
-    copyEmail: 'Copy Email',
-    copyWifiPassword: 'Copy Password',
-    copyWifiSsid: 'Copy SSID',
-    wifiSettingsBtn: 'Wi-Fi Settings',
-    wifiPassCopiedToast: 'Wi-Fi password copied',
-    wifiSsidCopiedToast: 'Network name (SSID) copied',
-    searchOnline: 'Search Online',
-    copyLink: 'Copy Link',
-    saveToGalleryHeader: 'Save to Gallery',
-    inFavorites: 'Favorited',
-    addToFavorites: 'Favorite',
-    qrTitleLabel: 'Code Name:',
-    qrTitlePlaceholder: 'e.g. Flight Boarding Pass or Store Card',
-    folderLabel: 'Folder Category:',
-    noteLabel: 'Note (optional):',
-    notePlaceholder: 'Any details, PIN code, or expiration date...',
-    cancelBtn: 'Cancel',
-    saveBtn: 'Save to Gallery',
-    updateBtn: 'Update in Gallery',
-    savedSuccessText: 'Saved in',
-
-    // Turnstile Modal
-    turnstileTitle: 'Max Brightness',
-    turnstileTip: 'Hold your screen to the turnstile or checkout scanner',
-    turnstileClose: 'Done',
-
-    // Gallery
-    searchPlaceholder: 'Search codes',
-    allCodesChip: 'All Codes',
-    favoritesChip: 'Favorites',
-    newFolderChip: 'New Folder',
-    manageFoldersBtn: 'Folders',
-    emptyTitle: 'This folder is empty',
-    emptySearchTitle: 'No codes found',
-    emptyDesc: 'Scan a QR or barcode from screen or camera, or create a new code.',
-    emptySearchDesc: 'Try adjusting your search query or pick a different folder.',
-    scanFirstBtn: 'Scan Code',
-    createFirstBtn: 'Create Code',
-    turnstileBtn: 'Turnstile',
-    moveToFolderTooltip: 'Move to another folder',
-    moveToTitle: 'Move to:',
-    deleteTooltip: 'Delete Code',
-    deleteConfirmTitle: 'Delete Code?',
-    deleteConfirm: 'Delete this code from Ectode gallery?',
-    deleteBtn: 'Delete',
-    backupBtn: 'Backup',
-    restoreBtn: 'Restore',
-    backupRestored: 'Successfully restored codes:',
-    backupError: 'Failed to read backup file.',
-    sortNewest: 'Newest',
-    sortOldest: 'Oldest',
-    sortFavorites: 'Favorites',
-    sortAlphabetical: 'A-Z',
-    sourceCamera: 'Camera',
-    sourceScreen: 'Screen Capture',
-    sourceFile: 'Screenshot',
-    sourceGenerated: 'Generated',
-
-    // Generator
-    generatorTitle: 'Code Content Parameters',
-    editModeBannerTitle: 'Editing Code',
-    editModeBannerDesc: 'Modify text, code format, palette, or error correction',
-    cancelEditBtn: 'Cancel',
-    saveChangesBtn: 'Save Changes',
-    changesSavedToast: 'Changes saved!',
-    tabEdit: 'Edit Code',
-    liveVectorPreview: 'Preview',
-    pristineVectorQuality: 'Vector Graphics',
-    saveToGalleryGen: 'Save to Gallery',
-    savedToGalleryGen: 'Saved to Ectode!',
-    templateText: 'Text',
-    templateUrl: 'URL',
-    templateWifi: 'Wi-Fi',
-    templateTicket: 'Ticket',
-    templateLoyalty: 'Card',
-    templateBarcode: 'Barcode',
-    templateContact: 'Contact',
-    templatePhone: 'Phone',
-    templateEmail: 'Email',
-    enterEmailLabel: 'Email Address:',
-    barcodeFormatSelectLabel: 'Barcode Standard:',
-    barcodeValueLabel: 'Barcode Value:',
-    barcodeSampleFill: 'Sample',
-    barcodeErrEmpty: 'Enter data to generate barcode',
-    barcodeErrEan13Digits: 'EAN-13 requires 12 or 13 digits',
-    barcodeErrEan13Check: 'Invalid EAN-13 check digit (last digit)',
-    barcodeErrEan8Digits: 'EAN-8 requires 7 or 8 digits',
-    barcodeErrEan8Check: 'Invalid EAN-8 check digit',
-    barcodeErrUpcaDigits: 'UPC-A requires 11 or 12 digits',
-    barcodeErrUpcaCheck: 'Invalid UPC-A check digit',
-    barcodeErrUpceDigits: 'UPC-E requires 6–8 digits (starting with 0 or 1)',
-    barcodeErrCode39: 'Code 39 allows 0–9, A–Z, space, and - . $ / + %',
-    barcodeErrItf: 'ITF-14 requires an even number of digits',
-    barcodeErrCodabar: 'Codabar allows digits 0–9 and - $ : / . +',
-    barcodeErrCode128: 'Code 128 supports ASCII text and digits',
-    codeTypeSwitchLabel: 'Code Type:',
-    codeKindQr: 'QR Code',
-    codeKindBarcode: 'Barcode',
-    enterTextLabel: 'Enter custom text:',
-    enterTextPlaceholder: 'Any text, note, promo code, or instruction...',
-    enterUrlLabel: 'Website URL:',
-    wifiSsidLabel: 'Network Name (SSID):',
-    wifiPassLabel: 'Password:',
-    wifiAuthLabel: 'Encryption:',
-    wifiAuthWpaDesc: 'Recommended security',
-    wifiAuthWepDesc: 'Legacy compatibility',
-    wifiAuthOpenLabel: 'No Password (Open)',
-    wifiAuthOpenDesc: 'Open network, no password',
-    wifiHiddenLabel: 'Hidden Network',
-    ticketEventLabel: 'Event / Flight / Movie:',
-    ticketEventPlaceholder: 'e.g. S7 Flight S7-2044 or Dune Part Two',
-    ticketSeatLabel: 'Seat / Gate / Row:',
-    ticketCodeLabel: 'Ticket Code:',
-    loyaltyStoreLabel: 'Store / Brand:',
-    loyaltyStorePlaceholder: 'Apple, Starbucks, Sephora, Target...',
-    loyaltyNumberLabel: 'Card Number / Barcode:',
-    vcardNameLabel: 'Full Name:',
-    vcardPhoneLabel: 'Phone:',
-    vcardEmailLabel: 'Email:',
-    vcardOrgLabel: 'Company / Job Title:',
-    phoneLabel: 'Phone Number:',
-    nameForGallery: 'Title for Gallery:',
-    styleLabel: 'Palette:',
-    rgbPaletteTitle: 'Custom RGB Palette:',
-    codeColorLabel: 'Code Color',
-    bgColorLabel: 'Background',
-    swapColors: 'Swap colors',
-    customRgbBadge: 'Custom RGB',
-    lowContrastWarning: 'Low contrast — scanners may fail to read this code',
-    redLabel: 'R',
-    greenLabel: 'G',
-    blueLabel: 'B',
-
-    // Folder Modal & Management
-    newFolderTitle: 'New Folder in Ectode',
-    editFolderTitle: 'Edit Folder',
-    manageFoldersTitle: 'Manage Folders',
-    manageFoldersDesc: 'Hold a folder to reorder, or customize icons & colors',
-    folderNameLabel: 'Folder Name:',
-    folderNamePlaceholder: 'e.g. Trip, Loyalty Cards, Invoices...',
-    folderNameError: 'Please enter a folder name',
-    folderIconLabel: 'Folder Icon:',
-    folderColorLabel: 'Icon Color:',
-    folderPreviewLabel: 'Preview:',
-    customColorLabel: 'Custom color',
-    deleteFolderTitle: 'Delete Folder?',
-    deleteFolderConfirm: 'The folder will be removed and any codes inside it will be moved to another folder.',
-    cannotDeleteLastFolder: 'Cannot delete the last remaining folder',
-    folderItemsCount: 'codes',
-    editFolderTooltip: 'Edit folder',
-    deleteFolderTooltip: 'Delete folder',
-    reorderFolderHint: 'Hold to reorder',
-    saveFolderBtn: 'Save Folder',
-
-    // About Modal
-    aboutTitle: 'Ectode',
-    feature1Title: 'Screen & Camera Capture',
-    feature1Desc: 'Read QR codes and barcodes directly from your active screen in any app or via camera.',
-    feature2Title: 'Code Reconstruction',
-    feature2Desc: 'Re-renders scanned QR codes and barcodes cleanly for turnstiles and checkout scanners.',
-    feature3Title: 'Gallery & Folders',
-    feature3Desc: 'Organize tickets, loyalty cards, Wi-Fi credentials and barcodes with ease.',
-    githubRepoTitle: 'GitHub Repository',
-    aboutUnderstood: 'Got It',
-
-    // Default Folder Translations
-    folderTickets: 'Tickets',
-    folderLoyalty: 'Loyalty Cards',
-    folderWifi: 'Wi-Fi Networks',
-    folderLinks: 'Links',
-    folderContacts: 'Contacts',
-    folderDocs: 'Documents & Other',
-  },
-} as const;
+export function normalizeStoredLanguage(raw?: string | null): Language | null {
+  if (!raw) return null;
+  const norm = raw.trim().toLowerCase().replace(/-/g, '_');
+  if (norm === 'ru' || norm === 'ru_ru') return 'ru';
+  if (norm === 'en' || norm === 'en_us' || norm === 'en_gb') return 'en';
+  if (norm === 'fr' || norm === 'fr_fr') return 'fr';
+  if (norm === 'de' || norm === 'de_de') return 'de';
+  if (norm === 'es' || norm === 'es_es') return 'es';
+  if (norm === 'pt' || norm === 'pt_pt' || norm === 'pt_br') return 'pt';
+  return null;
+}
 
 export function resolveDeviceLanguage(locale?: string | null): Language {
   const normalized = (locale || '').trim().toLowerCase();
-  if (normalized === 'ru' || normalized.startsWith('ru-') || normalized.startsWith('ru_')) {
-    return 'ru';
-  }
+  const matches = (code: string) =>
+    normalized === code || normalized.startsWith(`${code}-`) || normalized.startsWith(`${code}_`);
+
+  if (matches('ru')) return 'ru';
+  if (matches('fr')) return 'fr';
+  if (matches('de')) return 'de';
+  if (matches('es')) return 'es';
+  if (matches('pt')) return 'pt';
   return 'en';
 }
 
 export function getInitialLanguage(): Language {
   try {
     const saved = localStorage.getItem('ectode_language') || localStorage.getItem('ecode_language');
-    if (saved === 'ru' || saved === 'en') return saved;
+    const normalized = normalizeStoredLanguage(saved);
+    if (normalized) return normalized;
   } catch {
     // Ignore storage access errors and fall back to device language
   }
@@ -663,69 +94,83 @@ export function saveLanguagePreference(lang: Language): void {
   } catch {}
 }
 
+type StockFolderKey = 'folderTickets' | 'folderLoyalty' | 'folderWifi' | 'folderLinks' | 'folderContacts' | 'folderDocs';
+
+const STOCK_FOLDER_ID_TO_KEY: Record<string, StockFolderKey> = {
+  tickets: 'folderTickets',
+  loyalty: 'folderLoyalty',
+  wifi: 'folderWifi',
+  links: 'folderLinks',
+  contacts: 'folderContacts',
+  docs: 'folderDocs',
+};
+
 export function getLocalizedFolderName(folderId: string, defaultName: string, lang: Language): string {
   const dict = TRANSLATIONS[lang];
-  const stockNames: Record<string, { ru: string; en: string }> = {
-    tickets: { ru: TRANSLATIONS.ru.folderTickets, en: TRANSLATIONS.en.folderTickets },
-    loyalty: { ru: TRANSLATIONS.ru.folderLoyalty, en: TRANSLATIONS.en.folderLoyalty },
-    wifi: { ru: TRANSLATIONS.ru.folderWifi, en: TRANSLATIONS.en.folderWifi },
-    links: { ru: TRANSLATIONS.ru.folderLinks, en: TRANSLATIONS.en.folderLinks },
-    contacts: { ru: TRANSLATIONS.ru.folderContacts, en: TRANSLATIONS.en.folderContacts },
-    docs: { ru: TRANSLATIONS.ru.folderDocs, en: TRANSLATIONS.en.folderDocs },
-  };
-  const stock = stockNames[folderId];
-  if (stock && defaultName !== stock.ru && defaultName !== stock.en && defaultName.trim().length > 0) {
+  const key = STOCK_FOLDER_ID_TO_KEY[folderId];
+  if (!key) return defaultName;
+
+  const isKnownStockName = Object.values(TRANSLATIONS).some((localeDict) => localeDict[key] === defaultName);
+  if (!isKnownStockName && defaultName.trim().length > 0) {
     return defaultName;
   }
-  switch (folderId) {
-    case 'tickets': return dict.folderTickets;
-    case 'loyalty': return dict.folderLoyalty;
-    case 'wifi': return dict.folderWifi;
-    case 'links': return dict.folderLinks;
-    case 'contacts': return dict.folderContacts;
-    case 'docs': return dict.folderDocs;
-    default: return defaultName;
-  }
+  return dict[key];
 }
 
 export function getLocalizedDetailKey(key: string, lang: Language): string {
-  if (lang === 'ru') return key;
+  const dict = TRANSLATIONS[lang];
   switch (key) {
-    case 'Формат': return 'Format';
-    case 'Значение': return 'Value';
-    case 'Сеть (SSID)': return 'Network (SSID)';
-    case 'Пароль': return 'Password';
-    case 'Шифрование': return 'Security';
-    case 'Скрытая сеть': return 'Hidden Network';
-    case 'Имя': return 'Name';
-    case 'Телефон': return 'Phone';
-    case 'Организация': return 'Organization';
+    case 'Формат': return dict.detailKeys.format;
+    case 'Значение': return dict.detailKeys.value;
+    case 'Сеть (SSID)': return dict.detailKeys.ssid;
+    case 'Пароль': return dict.detailKeys.password;
+    case 'Шифрование': return dict.detailKeys.security;
+    case 'Скрытая сеть': return dict.detailKeys.hiddenNetwork;
+    case 'Имя': return dict.detailKeys.name;
+    case 'Телефон': return dict.detailKeys.phone;
+    case 'Организация': return dict.detailKeys.organization;
     default: return key;
   }
 }
 
 export function getLocalizedDetailValue(value: string, lang: Language): string {
-  if (lang === 'ru') return value;
+  const dict = TRANSLATIONS[lang];
   switch (value) {
-    case '(Без пароля)': return '(No password)';
-    case 'Неизвестная сеть': return 'Unknown network';
-    case 'Да': return 'Yes';
-    case 'Нет': return 'No';
-    case 'Контакт': return 'Contact';
+    case '(Без пароля)': return dict.detailValues.noPassword;
+    case 'Неизвестная сеть': return dict.detailValues.unknownNetwork;
+    case 'Да': return dict.detailValues.yes;
+    case 'Нет': return dict.detailValues.no;
+    case 'Контакт': return dict.detailValues.contact;
     default: return value;
   }
 }
 
-export function formatCodeCount(count: number, lang: Language): string {
-  if (lang === 'en') {
-    return count === 1 ? '1 code' : `${count} codes`;
+export function getLocalizedColorPresetName(presetId: string, fallbackName: string, lang: Language): string {
+  const dict = TRANSLATIONS[lang];
+  if (presetId in dict.colorPresets) {
+    return dict.colorPresets[presetId as ColorPresetId];
   }
-  const mod100 = count % 100;
-  const mod10 = count % 10;
-  if (mod100 >= 11 && mod100 <= 19) return `${count} кодов`;
-  if (mod10 === 1) return `${count} код`;
-  if (mod10 >= 2 && mod10 <= 4) return `${count} кода`;
-  return `${count} кодов`;
+  return fallbackName;
 }
 
+export function getLocalizedFolderIconLabel(iconId: string, fallbackLabel: string, lang: Language): string {
+  const dict = TRANSLATIONS[lang];
+  if (iconId in dict.folderIcons) {
+    return dict.folderIcons[iconId as FolderIconId];
+  }
+  return fallbackLabel;
+}
 
+export function formatCodeCount(count: number, lang: Language): string {
+  if (lang === 'ru') {
+    const mod100 = count % 100;
+    const mod10 = count % 10;
+    if (mod100 >= 11 && mod100 <= 19) return `${count} кодов`;
+    if (mod10 === 1) return `${count} код`;
+    if (mod10 >= 2 && mod10 <= 4) return `${count} кода`;
+    return `${count} кодов`;
+  }
+  const dict = TRANSLATIONS[lang];
+  const template = count === 1 ? dict.codeCountSingular : dict.codeCountPlural;
+  return template.replace('{count}', String(count));
+}

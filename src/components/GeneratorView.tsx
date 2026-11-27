@@ -163,7 +163,7 @@ export function GeneratorView({
   const rawQrString = useMemo(() => {
     switch (template) {
       case 'text':
-        return textContent.trim() || (lang === 'ru' ? 'Привет от Ectode!' : 'Hello from Ectode!');
+        return textContent.trim() || t.genDefaultTextHello;
       case 'url':
         return urlContent.trim() || 'https://google.com';
       case 'wifi':
@@ -181,7 +181,7 @@ export function GeneratorView({
         return barcodeValidation.normalizedValue || barcodeValue.trim();
       case 'vcard':
         return buildVCardQrString(
-          vcardName.trim() || (lang === 'ru' ? 'Имя Фамилия' : 'John Doe'),
+          vcardName.trim() || t.genDefaultVcardName,
           vcardPhone.trim(),
           vcardEmail.trim(),
           vcardOrg.trim()
@@ -214,7 +214,8 @@ export function GeneratorView({
     vcardOrg,
     phoneNumber,
     emailAddress,
-    lang,
+    t.genDefaultTextHello,
+    t.genDefaultVcardName,
   ]);
 
   // Determine auto title & suggested folder
@@ -224,19 +225,19 @@ export function GeneratorView({
 
     if (template === 'text') {
       type = 'text';
-      defaultTitle = textContent.slice(0, 24) || (lang === 'ru' ? 'Текстовый QR' : 'Text QR');
+      defaultTitle = textContent.slice(0, 24) || t.genAutoTitleText;
     } else if (template === 'url') {
       type = 'url';
-      defaultTitle = urlContent.replace(/^https?:\/\//, '').split('/')[0] || (lang === 'ru' ? 'Веб-ссылка' : 'Web Link');
+      defaultTitle = urlContent.replace(/^https?:\/\//, '').split('/')[0] || t.genAutoTitleUrl;
     } else if (template === 'wifi') {
       type = 'wifi';
-      defaultTitle = wifiSsid ? `Wi-Fi: ${wifiSsid}` : (lang === 'ru' ? 'Wi-Fi сеть' : 'Wi-Fi Network');
+      defaultTitle = wifiSsid ? `Wi-Fi: ${wifiSsid}` : t.genAutoTitleWifi;
     } else if (template === 'ticket') {
       type = 'ticket';
-      defaultTitle = ticketEvent ? `${lang === 'ru' ? 'Билет' : 'Ticket'}: ${ticketEvent}` : (lang === 'ru' ? 'Электронный билет' : 'E-Ticket');
+      defaultTitle = ticketEvent ? `${t.genAutoTitleTicketPrefix}: ${ticketEvent}` : t.genAutoTitleTicketEmpty;
     } else if (template === 'loyalty') {
       type = 'loyalty';
-      defaultTitle = loyaltyStore ? `${lang === 'ru' ? 'Карта' : 'Card'}: ${loyaltyStore}` : (lang === 'ru' ? 'Карта лояльности' : 'Loyalty Card');
+      defaultTitle = loyaltyStore ? `${t.genAutoTitleLoyaltyPrefix}: ${loyaltyStore}` : t.genAutoTitleLoyaltyEmpty;
     } else if (template === 'barcode') {
       type = 'barcode';
       const fmtLabel = getBarcodeFormatLabel(barcodeFormat);
@@ -244,10 +245,10 @@ export function GeneratorView({
       defaultTitle = val ? `${fmtLabel}: ${val}` : fmtLabel;
     } else if (template === 'vcard') {
       type = 'vcard';
-      defaultTitle = vcardName || (lang === 'ru' ? 'Контакт vCard' : 'vCard Contact');
+      defaultTitle = vcardName || t.genAutoTitleVcard;
     } else if (template === 'phone') {
       type = 'phone';
-      defaultTitle = phoneNumber ? `Tel: ${phoneNumber}` : (lang === 'ru' ? 'Телефон' : 'Phone');
+      defaultTitle = phoneNumber ? `Tel: ${phoneNumber}` : t.genAutoTitlePhone;
     } else if (template === 'email') {
       type = 'email';
       defaultTitle = emailAddress ? `Email: ${emailAddress}` : 'Email';
@@ -274,7 +275,15 @@ export function GeneratorView({
     textContent,
     titleManuallyEdited,
     folderManuallyEdited,
-    lang,
+    t.genAutoTitleLoyaltyEmpty,
+    t.genAutoTitleLoyaltyPrefix,
+    t.genAutoTitlePhone,
+    t.genAutoTitleText,
+    t.genAutoTitleTicketEmpty,
+    t.genAutoTitleTicketPrefix,
+    t.genAutoTitleUrl,
+    t.genAutoTitleVcard,
+    t.genAutoTitleWifi,
   ]);
 
   useEffect(() => {

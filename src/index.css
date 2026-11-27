@@ -264,10 +264,11 @@ html.light input[type="range"].rgb-range::-moz-range-thumb {
 }
 
 /* Native Android CameraX preview sits behind a transparent viewport hole */
-html.native-camera-active,
-html.native-camera-active body,
-html.native-camera-active .native-camera-root.native-camera-root,
-html.native-camera-active .native-camera-viewport.native-camera-viewport {
+html.native-camera-active.native-camera-active,
+html.native-camera-active.native-camera-active body,
+html.native-camera-active.native-camera-active #root,
+html.native-camera-active.native-camera-active .native-camera-root,
+html.native-camera-active.native-camera-active .native-camera-viewport {
   background-color: transparent !important;
 }
 

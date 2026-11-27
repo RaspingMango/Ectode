@@ -1,0 +1,405 @@
+export type Language = 'ru' | 'en' | 'fr' | 'de' | 'es' | 'pt';
+
+export type FolderIconId =
+  | 'Folder'
+  | 'Ticket'
+  | 'CreditCard'
+  | 'Wifi'
+  | 'Globe'
+  | 'User'
+  | 'FileText'
+  | 'Barcode'
+  | 'ShoppingBag'
+  | 'Plane'
+  | 'Briefcase'
+  | 'Home'
+  | 'Star'
+  | 'Key'
+  | 'Heart'
+  | 'Tag'
+  | 'Bookmark'
+  | 'Shield';
+
+export type ColorPresetId = 'classic' | 'mint' | 'sapphire' | 'amethyst' | 'amoled';
+
+export interface LocaleOptionMeta {
+  id: Language;
+  shortCode: string;
+  fileLocale: string;
+  intlLocale: string;
+  nativeName: string;
+  isAiTranslated: boolean;
+}
+
+export interface TranslationSchema {
+  // App Header
+  appSlogan: string;
+  soundOn: string;
+  soundOff: string;
+  aboutApp: string;
+
+  // Bottom Navigation
+  tabScanner: string;
+  tabGallery: string;
+  tabCreate: string;
+  tabSettings: string;
+
+  // Settings Screen
+  settingsTitle: string;
+  settingsSubtitle: string;
+  appearanceSection: string;
+  themeLabel: string;
+  themeDark: string;
+  themeLight: string;
+  themeSystem: string;
+  themeDarkDesc: string;
+  themeLightDesc: string;
+  languageSection: string;
+  langRussian: string;
+  langEnglish: string;
+  langFrench: string;
+  langGerman: string;
+  langSpanish: string;
+  langPortuguese: string;
+  aiTranslationBadge: string;
+  aiTranslationNoticeTitle: string;
+  aiTranslationNoticeDesc: string;
+  aiTranslationRepoCta: string;
+  feedbackSection: string;
+  soundTitle: string;
+  soundDesc: string;
+  hapticTitle: string;
+  hapticDesc: string;
+  galleryBadgeTitle: string;
+  galleryBadgeDesc: string;
+  downloadFormatLabel: string;
+  downloadFormatDesc: string;
+  downloadFormatPngDesc: string;
+  downloadFormatSvgDesc: string;
+  downloadFormatJpegDesc: string;
+  dataSection: string;
+  backupDataTitle: string;
+  backupDataDesc: string;
+  restoreDataTitle: string;
+  restoreDataDesc: string;
+  demoModeActivated: string;
+  demoModeDeactivated: string;
+  savedToDownloads: string;
+  downloadFailed: string;
+  clipboardPermissionDenied: string;
+  quickTilesSection: string;
+  quickTilesDesc: string;
+  pinCameraTileTitle: string;
+  pinCameraTileDesc: string;
+  pinScreenTileTitle: string;
+  pinScreenTileDesc: string;
+  pinTileBtn: string;
+  quickTilesManualHint: string;
+  tilePinAdded: string;
+  tilePinAlreadyAdded: string;
+  tilePinDismissed: string;
+  tilePinManualTip: string;
+  tilePinError: string;
+  aboutSection: string;
+  appVersion: string;
+
+  // Scanner
+  modeCamera: string;
+  modeScreen: string;
+  modeScreenshot: string;
+  scanningCamera: string;
+  scanningScreen: string;
+  screenModeTitle: string;
+  screenModeDesc: string;
+  startScreenCapture: string;
+  startScreenCaptureNative: string;
+  stopScreenCapture: string;
+  screenModeTip: string;
+  screenModeTipNative: string;
+  scanningScreenNativeTitle: string;
+  scanningScreenNativeDesc: string;
+  screenNotifTitle: string;
+  screenNotifText: string;
+  screenNotifStop: string;
+  screenDetectedTitle: string;
+  screenDetectedText: string;
+  screenCaptureStartFailed: string;
+  screenCaptureUnsupported: string;
+  screenshotTitle: string;
+  screenshotDesc: string;
+  chooseFromGallery: string;
+  pasteScreenshot: string;
+  analyzingImage: string;
+  noCodeDetectedInImage: string;
+  imageReadErrorPrefix: string;
+  clipboardUnsupported: string;
+  clipboardEmptyImage: string;
+  clipboardReadFailedPrefix: string;
+  cameraDisabled: string;
+  enableCamera: string;
+  cameraPermissionDenied: string;
+  torchTurnOn: string;
+  torchTurnOff: string;
+  flipCameraLabel: string;
+  cameraNotFound: string;
+  quickScanTest: string;
+  testWithoutCamera: string;
+  sampleTicket: string;
+  sampleLoyalty: string;
+  sampleWifi: string;
+  sampleBarcode: string;
+
+  // Clean QR Modal
+  cleanModalTitle: string;
+  cleanBarcodeModalTitle: string;
+  cleanModalSubtitle: string;
+  fullScreenTurnstile: string;
+  vectorOriginalBadge: string;
+  eccCorrection: string;
+  formatBadgeLabel: string;
+  downloadBtn: string;
+  downloadedBtn: string;
+  downloadMenuTitle: string;
+  downloadPng: string;
+  downloadSvg: string;
+  downloadJpeg: string;
+  copyImage: string;
+  copiedImage: string;
+  shareQr: string;
+  customizeStyle: string;
+  customizeBarcodeStyle: string;
+  paletteLabel: string;
+  eccLabel: string;
+  barcodeFormatLabel: string;
+  copyText: string;
+  copiedText: string;
+  openInBrowser: string;
+  openInApp: string;
+  openInAppNamedTemplate: string;
+  openInBrowserShort: string;
+  openInBrowserTooltip: string;
+  unableToOpenLink: string;
+  executeAction: string;
+  editCodeBtn: string;
+  quickActionsHeader: string;
+  addToContacts: string;
+  contactOpenedToast: string;
+  contactVcfSavedToast: string;
+  contactOpenFailedToast: string;
+  callNumber: string;
+  sendSms: string;
+  copyPhone: string;
+  sendEmail: string;
+  copyEmail: string;
+  copyWifiPassword: string;
+  copyWifiSsid: string;
+  wifiSettingsBtn: string;
+  wifiPassCopiedToast: string;
+  wifiSsidCopiedToast: string;
+  searchOnline: string;
+  copyLink: string;
+  saveToGalleryHeader: string;
+  inFavorites: string;
+  addToFavorites: string;
+  qrTitleLabel: string;
+  qrTitlePlaceholder: string;
+  folderLabel: string;
+  noteLabel: string;
+  notePlaceholder: string;
+  cancelBtn: string;
+  saveBtn: string;
+  updateBtn: string;
+  savedSuccessText: string;
+
+  // Turnstile Modal
+  turnstileTitle: string;
+  turnstileTip: string;
+  turnstileClose: string;
+
+  // Gallery
+  searchPlaceholder: string;
+  allCodesChip: string;
+  favoritesChip: string;
+  newFolderChip: string;
+  manageFoldersBtn: string;
+  emptyTitle: string;
+  emptySearchTitle: string;
+  emptyDesc: string;
+  emptySearchDesc: string;
+  scanFirstBtn: string;
+  createFirstBtn: string;
+  turnstileBtn: string;
+  moveToFolderTooltip: string;
+  moveToTitle: string;
+  deleteTooltip: string;
+  deleteConfirmTitle: string;
+  deleteConfirm: string;
+  deleteBtn: string;
+  backupBtn: string;
+  restoreBtn: string;
+  backupRestored: string;
+  backupError: string;
+  sortNewest: string;
+  sortOldest: string;
+  sortFavorites: string;
+  sortAlphabetical: string;
+  sourceCamera: string;
+  sourceScreen: string;
+  sourceFile: string;
+  sourceGenerated: string;
+
+  // Generator
+  generatorTitle: string;
+  editModeBannerTitle: string;
+  editModeBannerDesc: string;
+  cancelEditBtn: string;
+  saveChangesBtn: string;
+  changesSavedToast: string;
+  tabEdit: string;
+  liveVectorPreview: string;
+  pristineVectorQuality: string;
+  saveToGalleryGen: string;
+  savedToGalleryGen: string;
+  templateText: string;
+  templateUrl: string;
+  templateWifi: string;
+  templateTicket: string;
+  templateLoyalty: string;
+  templateBarcode: string;
+  templateContact: string;
+  templatePhone: string;
+  templateEmail: string;
+  enterEmailLabel: string;
+  barcodeFormatSelectLabel: string;
+  barcodeValueLabel: string;
+  barcodeSampleFill: string;
+  barcodeErrEmpty: string;
+  barcodeErrEan13Digits: string;
+  barcodeErrEan13Check: string;
+  barcodeErrEan8Digits: string;
+  barcodeErrEan8Check: string;
+  barcodeErrUpcaDigits: string;
+  barcodeErrUpcaCheck: string;
+  barcodeErrUpceDigits: string;
+  barcodeErrCode39: string;
+  barcodeErrItf: string;
+  barcodeErrCodabar: string;
+  barcodeErrCode128: string;
+  codeTypeSwitchLabel: string;
+  codeKindQr: string;
+  codeKindBarcode: string;
+  enterTextLabel: string;
+  enterTextPlaceholder: string;
+  enterUrlLabel: string;
+  wifiSsidLabel: string;
+  wifiPassLabel: string;
+  wifiAuthLabel: string;
+  wifiAuthWpaDesc: string;
+  wifiAuthWepDesc: string;
+  wifiAuthOpenLabel: string;
+  wifiAuthOpenDesc: string;
+  wifiHiddenLabel: string;
+  ticketEventLabel: string;
+  ticketEventPlaceholder: string;
+  ticketSeatLabel: string;
+  ticketCodeLabel: string;
+  loyaltyStoreLabel: string;
+  loyaltyStorePlaceholder: string;
+  loyaltyNumberLabel: string;
+  vcardNameLabel: string;
+  vcardPhoneLabel: string;
+  vcardEmailLabel: string;
+  vcardOrgLabel: string;
+  phoneLabel: string;
+  nameForGallery: string;
+  styleLabel: string;
+  rgbPaletteTitle: string;
+  codeColorLabel: string;
+  bgColorLabel: string;
+  swapColors: string;
+  customRgbBadge: string;
+  lowContrastWarning: string;
+  redLabel: string;
+  greenLabel: string;
+  blueLabel: string;
+  genDefaultTextHello: string;
+  genDefaultVcardName: string;
+  genAutoTitleText: string;
+  genAutoTitleUrl: string;
+  genAutoTitleWifi: string;
+  genAutoTitleTicketPrefix: string;
+  genAutoTitleTicketEmpty: string;
+  genAutoTitleLoyaltyPrefix: string;
+  genAutoTitleLoyaltyEmpty: string;
+  genAutoTitleVcard: string;
+  genAutoTitlePhone: string;
+
+  // Folder Modal & Management
+  newFolderTitle: string;
+  editFolderTitle: string;
+  defaultNewFolderName: string;
+  manageFoldersTitle: string;
+  manageFoldersDesc: string;
+  folderNameLabel: string;
+  folderNamePlaceholder: string;
+  folderNameError: string;
+  folderIconLabel: string;
+  folderColorLabel: string;
+  folderPreviewLabel: string;
+  customColorLabel: string;
+  deleteFolderTitle: string;
+  deleteFolderConfirm: string;
+  cannotDeleteLastFolder: string;
+  folderItemsCount: string;
+  editFolderTooltip: string;
+  deleteFolderTooltip: string;
+  reorderFolderHint: string;
+  saveFolderBtn: string;
+  codeCountSingular: string;
+  codeCountPlural: string;
+
+  // About Modal
+  aboutTitle: string;
+  feature1Title: string;
+  feature1Desc: string;
+  feature2Title: string;
+  feature2Desc: string;
+  feature3Title: string;
+  feature3Desc: string;
+  githubRepoTitle: string;
+  aboutUnderstood: string;
+
+  // Default Folder Translations
+  folderTickets: string;
+  folderLoyalty: string;
+  folderWifi: string;
+  folderLinks: string;
+  folderContacts: string;
+  folderDocs: string;
+
+  // Parsed metadata keys & values
+  detailKeys: {
+    format: string;
+    value: string;
+    ssid: string;
+    password: string;
+    security: string;
+    hiddenNetwork: string;
+    name: string;
+    phone: string;
+    organization: string;
+  };
+  detailValues: {
+    noPassword: string;
+    unknownNetwork: string;
+    yes: string;
+    no: string;
+    contact: string;
+  };
+
+  // Color preset names
+  colorPresets: Record<ColorPresetId, string>;
+
+  // Folder icon labels
+  folderIcons: Record<FolderIconId, string>;
+}

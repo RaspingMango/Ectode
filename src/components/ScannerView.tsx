@@ -317,7 +317,7 @@ export function ScannerView({
         }
       } catch (err: any) {
         console.warn('Native Android screen capture error:', err);
-        setErrorMsg((lang === 'ru' ? 'Не удалось запустить захват экрана: ' : 'Failed to start screen capture: ') + (err?.message || 'Error'));
+        setErrorMsg(t.screenCaptureStartFailed + (err?.message || 'Error'));
         nativeScreenActiveRef.current = false;
         setIsScanning(false);
       }
@@ -325,10 +325,7 @@ export function ScannerView({
     }
 
     if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-      setErrorMsg(lang === 'ru'
-        ? 'Захват экрана не поддерживается браузером. Попробуйте загрузить скриншот из файла или буфера.'
-        : 'Screen capture is not supported by your browser. Try uploading a screenshot.'
-      );
+      setErrorMsg(t.screenCaptureUnsupported);
       return;
     }
 
@@ -354,15 +351,16 @@ export function ScannerView({
     } catch (err: any) {
       console.warn('Screen capture error:', err);
       if (err.name !== 'NotAllowedError') {
-        setErrorMsg((lang === 'ru' ? 'Не удалось запустить захват экрана: ' : 'Failed to start screen capture: ') + (err.message || 'Error'));
+        setErrorMsg(t.screenCaptureStartFailed + (err.message || 'Error'));
       }
       setIsScanning(false);
     }
   }, [
     isNativeScreen,
-    lang,
     processVideoFrame,
     stopCurrentStream,
+    t.screenCaptureStartFailed,
+    t.screenCaptureUnsupported,
     t.screenDetectedText,
     t.screenDetectedTitle,
     t.screenNotifStop,
@@ -639,13 +637,10 @@ export function ScannerView({
         triggerHaptic([40, 30, 80]);
         onQrDetected(result.data, 'file', result.format);
       } else {
-        setErrorMsg(lang === 'ru'
-          ? 'QR-код или штрихкод на изображении не найден. Убедитесь, что код виден четко и не обрезан.'
-          : 'No QR code or barcode was detected in the image. Make sure the code is clear and uncropped.'
-        );
+        setErrorMsg(t.noCodeDetectedInImage);
       }
     } catch (err: any) {
-      setErrorMsg((lang === 'ru' ? 'Ошибка чтения изображения: ' : 'Image read error: ') + (err.message || ''));
+      setErrorMsg(t.imageReadErrorPrefix + (err.message || ''));
     } finally {
       setIsProcessingFile(false);
     }
@@ -658,10 +653,7 @@ export function ScannerView({
     try {
       const clipResult = await readClipboardImageFromDevice();
       if (!clipResult.supported) {
-        setErrorMsg(lang === 'ru'
-          ? 'Чтение буфера не поддерживается. Выберите файл скриншота из галереи.'
-          : 'Clipboard read is not supported. Please choose a screenshot file.'
-        );
+        setErrorMsg(t.clipboardUnsupported);
         return;
       }
       if (clipResult.permissionDenied) {
@@ -672,12 +664,9 @@ export function ScannerView({
         await handleFileScan(clipResult.file);
         return;
       }
-      setErrorMsg(lang === 'ru'
-        ? 'В буфере обмена нет изображения. Сделайте скриншот с кодом и нажмите кнопку снова.'
-        : 'No image found in clipboard. Take a screenshot with a QR code or barcode and try again.'
-      );
+      setErrorMsg(t.clipboardEmptyImage);
     } catch (err: any) {
-      setErrorMsg((lang === 'ru' ? 'Не удалось прочитать буфер обмена: ' : 'Failed to read clipboard: ') + (err.message || ''));
+      setErrorMsg(t.clipboardReadFailedPrefix + (err.message || ''));
     } finally {
       setIsProcessingFile(false);
     }

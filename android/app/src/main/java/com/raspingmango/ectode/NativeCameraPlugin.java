@@ -536,6 +536,12 @@ public class NativeCameraPlugin extends Plugin {
         if (getBridge() != null && getBridge().getWebView() != null) {
             getBridge().getWebView().setBackgroundColor(currentBackdropColor);
         }
+        if (previewView != null) {
+            if (previewView.getParent() instanceof ViewGroup) {
+                ((ViewGroup) previewView.getParent()).removeView(previewView);
+            }
+            previewView = null;
+        }
         if (backdropContainer != null && backdropContainer.getParent() instanceof ViewGroup) {
             ((ViewGroup) backdropContainer.getParent()).removeView(backdropContainer);
         }

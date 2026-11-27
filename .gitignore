@@ -7,18 +7,23 @@ coverage/
 .env*
 !.env.example
 
-# Android / Capacitor build artifacts
+# Android / Capacitor build & sync artifacts
 android/.gradle/
 android/build/
 android/*/build/
 android/local.properties
 android/keystore.properties
+android/capacitor-cordova-android-plugins/
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/app/src/main/assets/capacitor.plugins.json
+android/app/src/main/res/xml/config.xml
 *.apk
 *.aab
 *.jks
 *.keystore
 
-# Uploaded chat screenshots
+# Uploaded chat screenshots & temporary browser verification artifacts
 public/assets/aistudio/
-
-
+**/assets/aistudio/
+.playwright-cli/
